@@ -89,6 +89,13 @@ whose size is determined when the object is allocated.
 #define PyVarObject_HEAD_INIT(type, size)       \
     { PyObject_HEAD_INIT(type) size },
 
+#define PyObject_LONGLIVED_HEAD_INIT(type)  \
+    { _PyObject_EXTRA_INIT                  \
+      _Py_REF_MAX, type },
+
+#define PyVarObject_LONGLIVED_HEAD_INIT(type, size)  \
+    { PyObject_LONGLIVED_HEAD_INIT(type) size },
+
 /* PyObject_VAR_HEAD defines the initial segment of all variable-size
  * container objects.  These end with a declaration of an array with 1
  * element, but enough space is malloc'ed so that the array actually
@@ -715,6 +722,9 @@ you can count such references to the type object.)
 PyAPI_DATA(Py_ssize_t) _Py_RefTotal;
 PyAPI_FUNC(void) _Py_NegativeRefcount(const char *fname,
                                             int lineno, PyObject *op);
+
+#define _Py_REF_MAX PY_SSIZE_T_MAX
+
 PyAPI_FUNC(Py_ssize_t) _Py_GetRefTotal(void);
 #define _Py_INC_REFTOTAL        _Py_RefTotal++
 #define _Py_DEC_REFTOTAL        _Py_RefTotal--
@@ -780,18 +790,24 @@ PyAPI_FUNC(void) _Py_Dealloc(PyObject *);
 #endif
 #endif /* !Py_TRACE_REFS */
 
-#define Py_INCREF(op) (                         \
-    _Py_INC_REFTOTAL  _Py_REF_DEBUG_COMMA       \
-    ((PyObject *)(op))->ob_refcnt++)
+#define Py_INCREF(op)                                    \
+    do {                                                 \
+        _Py_INC_REFTOTAL;                                \
+        PyObject *_py_incref_tmp = (PyObject *)(op);     \
+        if (_py_incref_tmp->ob_refcnt != _Py_REF_MAX)    \
+            _py_incref_tmp->ob_refcnt++;                 \
+    } while (0)
 
 #define Py_DECREF(op)                                   \
     do {                                                \
         PyObject *_py_decref_tmp = (PyObject *)(op);    \
-        if (_Py_DEC_REFTOTAL  _Py_REF_DEBUG_COMMA       \
-        --(_py_decref_tmp)->ob_refcnt != 0)             \
-            _Py_CHECK_REFCNT(_py_decref_tmp)            \
-        else                                            \
-            _Py_Dealloc(_py_decref_tmp);                \
+        if(_py_decref_tmp->ob_refcnt != _Py_REF_MAX) {  \
+            if (_Py_DEC_REFTOTAL  _Py_REF_DEBUG_COMMA   \
+            --(_py_decref_tmp)->ob_refcnt != 0)         \
+                _Py_CHECK_REFCNT(_py_decref_tmp)        \
+            else                                        \
+                _Py_Dealloc(_py_decref_tmp);            \
+        }                                               \
     } while (0)
 
 /* Safely decref `op` and set `op` to NULL, especially useful in tp_clear
@@ -910,7 +926,7 @@ PyAPI_DATA(PyObject) _Py_NoneStruct; /* Don't use this directly */
 #define Py_None (&_Py_NoneStruct)
 
 /* Macro for returning Py_None from a function */
-#define Py_RETURN_NONE return Py_INCREF(Py_None), Py_None
+#define Py_RETURN_NONE do { Py_INCREF(Py_None); return Py_None; } while (0)
 
 /*
 Py_NotImplemented is a singleton used to signal that an operation is
@@ -921,7 +937,7 @@ PyAPI_DATA(PyObject) _Py_NotImplementedStruct; /* Don't use this directly */
 
 /* Macro for returning Py_NotImplemented from a function */
 #define Py_RETURN_NOTIMPLEMENTED \
-    return Py_INCREF(Py_NotImplemented), Py_NotImplemented
+    do { Py_INCREF(Py_NotImplemented); return Py_NotImplemented; } while (0)
 
 /* Rich comparison opcodes */
 #define Py_LT 0
