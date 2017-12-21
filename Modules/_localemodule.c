@@ -318,7 +318,6 @@ PyLocale_getdefaultlocale(PyObject* self)
     }
 
     /* cannot determine the language code (very unlikely) */
-    Py_INCREF(Py_None);
     return Py_BuildValue("Os", Py_None, encoding);
 }
 #endif

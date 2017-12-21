@@ -1544,7 +1544,7 @@ PyTypeObject _PyNotImplemented_Type = {
 
 PyObject _Py_NotImplementedStruct = {
     _PyObject_EXTRA_INIT
-    1, &_PyNotImplemented_Type
+    _Py_REF_MAX, &_PyNotImplemented_Type
 };
 
 void

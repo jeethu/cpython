@@ -518,8 +518,6 @@ range_hash(rangeobject *r)
     if (cmp_result == -1)
         goto end;
     if (cmp_result == 1) {
-        Py_INCREF(Py_None);
-        Py_INCREF(Py_None);
         PyTuple_SET_ITEM(t, 1, Py_None);
         PyTuple_SET_ITEM(t, 2, Py_None);
     }
@@ -535,7 +533,6 @@ range_hash(rangeobject *r)
         if (cmp_result == -1)
             goto end;
         if (cmp_result == 1) {
-            Py_INCREF(Py_None);
             PyTuple_SET_ITEM(t, 2, Py_None);
         }
         else {
@@ -707,7 +704,7 @@ static PyMemberDef range_members[] = {
 };
 
 PyTypeObject PyRange_Type = {
-        PyVarObject_HEAD_INIT(&PyType_Type, 0)
+        PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
         "range",                /* Name of this type */
         sizeof(rangeobject),    /* Basic object size */
         0,                      /* Item size for varobject */
@@ -842,7 +839,7 @@ static PyMethodDef rangeiter_methods[] = {
 static PyObject *rangeiter_new(PyTypeObject *, PyObject *args, PyObject *kw);
 
 PyTypeObject PyRangeIter_Type = {
-        PyVarObject_HEAD_INIT(&PyType_Type, 0)
+        PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
         "range_iterator",                        /* tp_name */
         sizeof(rangeiterobject),                /* tp_basicsize */
         0,                                      /* tp_itemsize */
@@ -1092,7 +1089,7 @@ longrangeiter_next(longrangeiterobject *r)
 }
 
 PyTypeObject PyLongRangeIter_Type = {
-        PyVarObject_HEAD_INIT(&PyType_Type, 0)
+        PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
         "longrange_iterator",                   /* tp_name */
         sizeof(longrangeiterobject),            /* tp_basicsize */
         0,                                      /* tp_itemsize */

@@ -27,15 +27,13 @@ used for special methods; variants without leading and trailing\n\
   PyObject *a1, *a2; \
   if(! PyArg_UnpackTuple(a,#OP,2,2,&a1,&a2)) return NULL; \
   if(-1 == AOP(a1,a2)) return NULL; \
-  Py_INCREF(Py_None); \
-  return Py_None; }
+  Py_RETURN_NONE; }
 
 #define spam3n(OP,AOP) static PyObject *OP(PyObject *s, PyObject *a) { \
   PyObject *a1, *a2, *a3; \
   if(! PyArg_UnpackTuple(a,#OP,3,3,&a1,&a2,&a3)) return NULL; \
   if(-1 == AOP(a1,a2,a3)) return NULL; \
-  Py_INCREF(Py_None); \
-  return Py_None; }
+  Py_RETURN_NONE; }
 
 #define spami(OP,AOP) static PyObject *OP(PyObject *s, PyObject *a1) { \
   long r; \

@@ -402,8 +402,7 @@ gen_close(PyGenObject *gen, PyObject *args)
     if (PyErr_ExceptionMatches(PyExc_StopIteration)
         || PyErr_ExceptionMatches(PyExc_GeneratorExit)) {
         PyErr_Clear();          /* ignore these errors */
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     return NULL;
 }
@@ -742,7 +741,7 @@ static PyMethodDef gen_methods[] = {
 };
 
 PyTypeObject PyGen_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "generator",                                /* tp_name */
     sizeof(PyGenObject),                        /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -994,7 +993,7 @@ static PyAsyncMethods coro_as_async = {
 };
 
 PyTypeObject PyCoro_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "coroutine",                                /* tp_name */
     sizeof(PyCoroObject),                       /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -1093,7 +1092,7 @@ static PyMethodDef coro_wrapper_methods[] = {
 };
 
 PyTypeObject _PyCoroWrapper_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "coroutine_wrapper",
     sizeof(PyCoroWrapper),                      /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -1178,7 +1177,7 @@ static PyAsyncMethods aiter_wrapper_as_async = {
 };
 
 PyTypeObject _PyAIterWrapper_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "aiter_wrapper",
     sizeof(PyAIterWrapper),                     /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -1433,7 +1432,7 @@ static PyAsyncMethods async_gen_as_async = {
 
 
 PyTypeObject PyAsyncGen_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "async_generator",                          /* tp_name */
     sizeof(PyAsyncGenObject),                   /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -1665,7 +1664,7 @@ static PyAsyncMethods async_gen_asend_as_async = {
 
 
 PyTypeObject _PyAsyncGenASend_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "async_generator_asend",                    /* tp_name */
     sizeof(PyAsyncGenASend),                    /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -1762,7 +1761,7 @@ async_gen_wrapped_val_traverse(_PyAsyncGenWrappedValue *o,
 
 
 PyTypeObject _PyAsyncGenWrappedValue_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "async_generator_wrapped_value",            /* tp_name */
     sizeof(_PyAsyncGenWrappedValue),            /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -2019,7 +2018,7 @@ static PyAsyncMethods async_gen_athrow_as_async = {
 
 
 PyTypeObject _PyAsyncGenAThrow_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "async_generator_athrow",                   /* tp_name */
     sizeof(PyAsyncGenAThrow),                   /* tp_basicsize */
     0,                                          /* tp_itemsize */

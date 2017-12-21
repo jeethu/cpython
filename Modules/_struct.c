@@ -1424,7 +1424,6 @@ s_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self = type->tp_alloc(type, 0);
     if (self != NULL) {
         PyStructObject *s = (PyStructObject*)self;
-        Py_INCREF(Py_None);
         s->s_format = Py_None;
         s->s_codes = NULL;
         s->s_size = -1;
@@ -1657,7 +1656,7 @@ unpackiter_iternext(unpackiterobject *self)
 }
 
 static PyTypeObject unpackiter_type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "unpack_iterator",                          /* tp_name */
     sizeof(unpackiterobject),                   /* tp_basicsize */
     0,                                          /* tp_itemsize */

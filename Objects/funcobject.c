@@ -322,8 +322,7 @@ static PyObject *
 func_get_defaults(PyFunctionObject *op)
 {
     if (op->func_defaults == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     Py_INCREF(op->func_defaults);
     return op->func_defaults;
@@ -350,8 +349,7 @@ static PyObject *
 func_get_kwdefaults(PyFunctionObject *op)
 {
     if (op->func_kwdefaults == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     Py_INCREF(op->func_kwdefaults);
     return op->func_kwdefaults;
@@ -626,7 +624,7 @@ func_descr_get(PyObject *func, PyObject *obj, PyObject *type)
 }
 
 PyTypeObject PyFunction_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "function",
     sizeof(PyFunctionObject),
     0,
@@ -799,7 +797,7 @@ Class methods are different than C++ or Java static methods.\n\
 If you want those, see the staticmethod builtin.");
 
 PyTypeObject PyClassMethod_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "classmethod",
     sizeof(classmethod),
     0,
@@ -977,7 +975,7 @@ Static methods in Python are similar to those found in Java or C++.\n\
 For a more advanced concept, see the classmethod builtin.");
 
 PyTypeObject PyStaticMethod_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "staticmethod",
     sizeof(staticmethod),
     0,

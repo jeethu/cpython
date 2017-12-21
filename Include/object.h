@@ -723,8 +723,6 @@ PyAPI_DATA(Py_ssize_t) _Py_RefTotal;
 PyAPI_FUNC(void) _Py_NegativeRefcount(const char *fname,
                                             int lineno, PyObject *op);
 
-#define _Py_REF_MAX PY_SSIZE_T_MAX
-
 PyAPI_FUNC(Py_ssize_t) _Py_GetRefTotal(void);
 #define _Py_INC_REFTOTAL        _Py_RefTotal++
 #define _Py_DEC_REFTOTAL        _Py_RefTotal--
@@ -926,7 +924,7 @@ PyAPI_DATA(PyObject) _Py_NoneStruct; /* Don't use this directly */
 #define Py_None (&_Py_NoneStruct)
 
 /* Macro for returning Py_None from a function */
-#define Py_RETURN_NONE do { Py_INCREF(Py_None); return Py_None; } while (0)
+#define Py_RETURN_NONE return Py_None
 
 /*
 Py_NotImplemented is a singleton used to signal that an operation is
@@ -936,8 +934,7 @@ PyAPI_DATA(PyObject) _Py_NotImplementedStruct; /* Don't use this directly */
 #define Py_NotImplemented (&_Py_NotImplementedStruct)
 
 /* Macro for returning Py_NotImplemented from a function */
-#define Py_RETURN_NOTIMPLEMENTED \
-    do { Py_INCREF(Py_NotImplemented); return Py_NotImplemented; } while (0)
+#define Py_RETURN_NOTIMPLEMENTED return Py_NotImplemented
 
 /* Rich comparison opcodes */
 #define Py_LT 0

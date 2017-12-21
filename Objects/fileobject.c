@@ -458,8 +458,7 @@ static PyMethodDef stdprinter_methods[] = {
 static PyObject *
 get_closed(PyStdPrinter_Object *self, void *closure)
 {
-    Py_INCREF(Py_False);
-    return Py_False;
+    Py_RETURN_FALSE;
 }
 
 static PyObject *
@@ -482,7 +481,7 @@ static PyGetSetDef stdprinter_getsetlist[] = {
 };
 
 PyTypeObject PyStdPrinter_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "stderrprinter",                            /* tp_name */
     sizeof(PyStdPrinter_Object),                /* tp_basicsize */
     0,                                          /* tp_itemsize */

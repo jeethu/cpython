@@ -50,7 +50,6 @@ PyMember_GetOne(const char *addr, PyMemberDef *l)
         break;
     case T_STRING:
         if (*(char**)addr == NULL) {
-            Py_INCREF(Py_None);
             v = Py_None;
         }
         else

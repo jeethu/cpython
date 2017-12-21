@@ -962,7 +962,6 @@ r_object(RFILE *p)
         break;
 
     case TYPE_NONE:
-        Py_INCREF(Py_None);
         retval = Py_None;
         break;
 
@@ -977,12 +976,10 @@ r_object(RFILE *p)
         break;
 
     case TYPE_FALSE:
-        Py_INCREF(Py_False);
         retval = Py_False;
         break;
 
     case TYPE_TRUE:
-        Py_INCREF(Py_True);
         retval = Py_True;
         break;
 

@@ -421,8 +421,7 @@ static PyObject *
 member_get_doc(PyMemberDescrObject *descr, void *closure)
 {
     if (descr->d_member->doc == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     return PyUnicode_FromString(descr->d_member->doc);
 }
@@ -437,8 +436,7 @@ static PyObject *
 getset_get_doc(PyGetSetDescrObject *descr, void *closure)
 {
     if (descr->d_getset->doc == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     return PyUnicode_FromString(descr->d_getset->doc);
 }
@@ -477,7 +475,7 @@ descr_traverse(PyObject *self, visitproc visit, void *arg)
 }
 
 PyTypeObject PyMethodDescr_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "method_descriptor",
     sizeof(PyMethodDescrObject),
     0,
@@ -515,7 +513,7 @@ PyTypeObject PyMethodDescr_Type = {
 
 /* This is for METH_CLASS in C, not for "f = classmethod(f)" in Python! */
 PyTypeObject PyClassMethodDescr_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "classmethod_descriptor",
     sizeof(PyMethodDescrObject),
     0,
@@ -552,7 +550,7 @@ PyTypeObject PyClassMethodDescr_Type = {
 };
 
 PyTypeObject PyMemberDescr_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "member_descriptor",
     sizeof(PyMemberDescrObject),
     0,
@@ -589,7 +587,7 @@ PyTypeObject PyMemberDescr_Type = {
 };
 
 PyTypeObject PyGetSetDescr_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "getset_descriptor",
     sizeof(PyGetSetDescrObject),
     0,
@@ -626,7 +624,7 @@ PyTypeObject PyGetSetDescr_Type = {
 };
 
 PyTypeObject PyWrapperDescr_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "wrapper_descriptor",
     sizeof(PyWrapperDescrObject),
     0,
@@ -931,7 +929,7 @@ mappingproxy_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 PyTypeObject PyDictProxy_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "mappingproxy",                             /* tp_name */
     sizeof(mappingproxyobject),                 /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -1191,7 +1189,7 @@ wrapper_traverse(PyObject *self, visitproc visit, void *arg)
 }
 
 PyTypeObject _PyMethodWrapper_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "method-wrapper",                           /* tp_name */
     sizeof(wrapperobject),                      /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -1603,7 +1601,7 @@ property_clear(PyObject *self)
 }
 
 PyTypeObject PyProperty_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "property",                                 /* tp_name */
     sizeof(propertyobject),                     /* tp_basicsize */
     0,                                          /* tp_itemsize */

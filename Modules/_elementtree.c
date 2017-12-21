@@ -271,10 +271,8 @@ create_new_element(PyObject* tag, PyObject* attrib)
     Py_INCREF(tag);
     self->tag = tag;
 
-    Py_INCREF(Py_None);
     self->text = Py_None;
 
-    Py_INCREF(Py_None);
     self->tail = Py_None;
 
     self->weakreflist = NULL;
@@ -297,13 +295,10 @@ element_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     ElementObject *e = (ElementObject *)type->tp_alloc(type, 0);
     if (e != NULL) {
-        Py_INCREF(Py_None);
         e->tag = Py_None;
 
-        Py_INCREF(Py_None);
         e->text = Py_None;
 
-        Py_INCREF(Py_None);
         e->tail = Py_None;
 
         e->extra = NULL;
@@ -403,10 +398,8 @@ element_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(tag);
     Py_XSETREF(self_elem->tag, tag);
 
-    Py_INCREF(Py_None);
     _set_joined_ptr(&self_elem->text, Py_None);
 
-    Py_INCREF(Py_None);
     _set_joined_ptr(&self_elem->tail, Py_None);
 
     return 0;
@@ -496,7 +489,6 @@ element_get_attrib(ElementObject* self)
         res = PyDict_New();
         if (!res)
             return NULL;
-        Py_DECREF(Py_None);
         self->extra->attrib = res;
     }
 
@@ -578,7 +570,6 @@ subelement(PyObject *self, PyObject *args, PyObject *kwds)
             return NULL;
     } else {
         /* no attrib arg, no kwds, so no attribute */
-        Py_INCREF(Py_None);
         attrib = Py_None;
     }
 
@@ -676,10 +667,8 @@ _elementtree_Element_clear_impl(ElementObject *self)
 {
     dealloc_extra(self);
 
-    Py_INCREF(Py_None);
     _set_joined_ptr(&self->text, Py_None);
 
-    Py_INCREF(Py_None);
     _set_joined_ptr(&self->tail, Py_None);
 
     Py_RETURN_NONE;
@@ -759,7 +748,6 @@ _elementtree_Element___deepcopy__(ElementObject *self, PyObject *memo)
             return NULL;
         }
     } else {
-        Py_INCREF(Py_None);
         attrib = Py_None;
     }
 
@@ -2316,9 +2304,7 @@ treebuilder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (t != NULL) {
         t->root = NULL;
 
-        Py_INCREF(Py_None);
         t->this = Py_None;
-        Py_INCREF(Py_None);
         t->last = Py_None;
 
         t->data = NULL;
@@ -2960,7 +2946,6 @@ expat_start_handler(XMLParserObject* self, const XML_Char* tag_in,
             attrib_in += 2;
         }
     } else {
-        Py_INCREF(Py_None);
         attrib = Py_None;
     }
 
@@ -3125,7 +3110,6 @@ expat_start_doctype_handler(XMLParserObject *self,
             return;
         }
     } else {
-        Py_INCREF(Py_None);
         sysid_obj = Py_None;
     }
 
@@ -3137,7 +3121,6 @@ expat_start_doctype_handler(XMLParserObject *self,
             return;
         }
     } else {
-        Py_INCREF(Py_None);
         pubid_obj = Py_None;
     }
 

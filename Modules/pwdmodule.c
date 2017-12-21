@@ -59,7 +59,6 @@ sets(PyObject *v, int i, const char* val)
   }
   else {
       PyStructSequence_SET_ITEM(v, i, Py_None);
-      Py_INCREF(Py_None);
   }
 }
 

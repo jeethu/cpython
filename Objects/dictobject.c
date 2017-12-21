@@ -3279,7 +3279,7 @@ PyDoc_STRVAR(dictionary_doc,
 "    in the keyword argument list.  For example:  dict(one=1, two=2)");
 
 PyTypeObject PyDict_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "dict",
     sizeof(PyDictObject),
     0,
@@ -3528,7 +3528,7 @@ fail:
 }
 
 PyTypeObject PyDictIterKey_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "dict_keyiterator",                         /* tp_name */
     sizeof(dictiterobject),                     /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -3612,7 +3612,7 @@ fail:
 }
 
 PyTypeObject PyDictIterValue_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "dict_valueiterator",                       /* tp_name */
     sizeof(dictiterobject),                     /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -3716,7 +3716,7 @@ fail:
 }
 
 PyTypeObject PyDictIterItem_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "dict_itemiterator",                        /* tp_name */
     sizeof(dictiterobject),                     /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -4149,7 +4149,7 @@ static PyMethodDef dictkeys_methods[] = {
 };
 
 PyTypeObject PyDictKeys_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "dict_keys",                                /* tp_name */
     sizeof(_PyDictViewObject),                  /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -4239,7 +4239,7 @@ static PyMethodDef dictitems_methods[] = {
 };
 
 PyTypeObject PyDictItems_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "dict_items",                               /* tp_name */
     sizeof(_PyDictViewObject),                  /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -4304,7 +4304,7 @@ static PyMethodDef dictvalues_methods[] = {
 };
 
 PyTypeObject PyDictValues_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "dict_values",                              /* tp_name */
     sizeof(_PyDictViewObject),                  /* tp_basicsize */
     0,                                          /* tp_itemsize */

@@ -68,7 +68,6 @@ mkgrent(struct group *p)
             SET(setIndex++, PyUnicode_DecodeFSDefault(p->gr_passwd));
     else {
             SET(setIndex++, Py_None);
-            Py_INCREF(Py_None);
     }
     SET(setIndex++, _PyLong_FromGid(p->gr_gid));
     SET(setIndex++, w);

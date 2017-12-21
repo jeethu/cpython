@@ -262,8 +262,7 @@ static PyObject* fcicreate(PyObject* obj, PyObject* args)
     if (!FCIDestroy(hfci))
         goto err;
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 err:
     if(erf.fError)
         PyErr_Format(PyExc_ValueError, "FCI error %d", erf.erfOper); /* XXX better error type */
@@ -292,8 +291,7 @@ msiobj_close(msiobj* msidb, PyObject *args)
 {
     MsiCloseHandle(msidb->h);
     msidb->h = 0;
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject*
@@ -408,8 +406,7 @@ record_cleardata(msiobj* record, PyObject *args)
     if (status != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject*
@@ -425,8 +422,7 @@ record_setstring(msiobj* record, PyObject *args)
     if ((status = MsiRecordSetStringW(record->h, field, data)) != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject*
@@ -442,8 +438,7 @@ record_setstream(msiobj* record, PyObject *args)
     if ((status = MsiRecordSetStreamW(record->h, field, data)) != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject*
@@ -459,8 +454,7 @@ record_setinteger(msiobj* record, PyObject *args)
     if ((status = MsiRecordSetInteger(record->h, field, data)) != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -630,8 +624,7 @@ summary_setproperty(msiobj* si, PyObject *args)
     if (status != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -643,8 +636,7 @@ summary_persist(msiobj* si, PyObject *args)
     status = MsiSummaryInfoPersist(si->h);
     if (status != ERROR_SUCCESS)
         return msierror(status);
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyMethodDef summary_methods[] = {
@@ -727,8 +719,7 @@ view_execute(msiobj *view, PyObject*args)
     if (status != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject*
@@ -781,8 +772,7 @@ view_modify(msiobj *view, PyObject *args)
     if ((status = MsiViewModify(view->h, kind, ((msiobj*)data)->h)) != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject*
@@ -793,8 +783,7 @@ view_close(msiobj *view, PyObject*args)
     if ((status = MsiViewClose(view->h)) != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyMethodDef view_methods[] = {
@@ -889,8 +878,7 @@ msidb_commit(msiobj *msidb, PyObject *args)
     if ((status = MsiDatabaseCommit(msidb->h)) != ERROR_SUCCESS)
         return msierror(status);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject*

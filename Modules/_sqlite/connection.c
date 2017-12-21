@@ -101,7 +101,6 @@ int pysqlite_connection_init(pysqlite_Connection* self, PyObject* args, PyObject
     self->statements = NULL;
     self->cursors = NULL;
 
-    Py_INCREF(Py_None);
     self->row_factory = Py_None;
 
     Py_INCREF(&PyUnicode_Type);
@@ -400,8 +399,7 @@ error:
     if (PyErr_Occurred()) {
         return NULL;
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -443,8 +441,7 @@ error:
     if (PyErr_Occurred()) {
         return NULL;
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -487,8 +484,7 @@ error:
     if (PyErr_Occurred()) {
         return NULL;
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -559,7 +555,6 @@ PyObject* _pysqlite_build_py_params(sqlite3_context *context, int argc, sqlite3_
                 /* TODO: have a way to show errors here */
                 if (!cur_py_value) {
                     PyErr_Clear();
-                    Py_INCREF(Py_None);
                     cur_py_value = Py_None;
                 }
                 break;
@@ -570,7 +565,6 @@ PyObject* _pysqlite_build_py_params(sqlite3_context *context, int argc, sqlite3_
                 break;
             case SQLITE_NULL:
             default:
-                Py_INCREF(Py_None);
                 cur_py_value = Py_None;
         }
 
@@ -1427,7 +1421,6 @@ pysqlite_connection_interrupt(pysqlite_Connection* self, PyObject* args)
 
     sqlite3_interrupt(self->db);
 
-    Py_INCREF(Py_None);
     retval = Py_None;
 
 finally:
@@ -1561,7 +1554,6 @@ finally:
     if (PyErr_Occurred()) {
         retval = NULL;
     } else {
-        Py_INCREF(Py_None);
         retval = Py_None;
     }
 

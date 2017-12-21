@@ -309,7 +309,6 @@ random_seed(RandomObject *self, PyObject *args)
 #endif
     init_by_array(self, key, keyused);
 
-    Py_INCREF(Py_None);
     result = Py_None;
 
 Done:
@@ -382,8 +381,7 @@ random_setstate(RandomObject *self, PyObject *state)
     for (i = 0; i < N; i++)
         self->state[i] = new_state[i];
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject *

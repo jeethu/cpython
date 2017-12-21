@@ -814,7 +814,6 @@ bytesio_getstate(bytesio *self)
     if (initvalue == NULL)
         return NULL;
     if (self->dict == NULL) {
-        Py_INCREF(Py_None);
         dict = Py_None;
     }
     else {

@@ -136,8 +136,7 @@ PyEval_GetCallStats(PyObject *self)
 PyObject *
 PyEval_GetCallStats(PyObject *self)
 {
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 #endif
 
@@ -1368,12 +1367,10 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             int err = PyObject_IsTrue(value);
             Py_DECREF(value);
             if (err == 0) {
-                Py_INCREF(Py_True);
                 SET_TOP(Py_True);
                 DISPATCH();
             }
             else if (err > 0) {
-                Py_INCREF(Py_False);
                 SET_TOP(Py_False);
                 err = 0;
                 DISPATCH();
@@ -3599,7 +3596,6 @@ fast_block_end:
                     PUSH(tstate->exc_type);
                 }
                 else {
-                    Py_INCREF(Py_None);
                     PUSH(Py_None);
                 }
                 PyErr_Fetch(&exc, &val, &tb);

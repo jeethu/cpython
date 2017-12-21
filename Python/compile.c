@@ -4649,7 +4649,6 @@ compiler_error(struct compiler *c, const char *errstr)
 
     loc = PyErr_ProgramTextObject(c->c_filename, c->u->u_lineno);
     if (!loc) {
-        Py_INCREF(Py_None);
         loc = Py_None;
     }
     u = Py_BuildValue("(OiiO)", c->c_filename, c->u->u_lineno,

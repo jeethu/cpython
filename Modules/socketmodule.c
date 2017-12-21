@@ -1188,8 +1188,7 @@ makesockaddr(SOCKET_T sockfd, struct sockaddr *addr, size_t addrlen, int proto)
 {
     if (addrlen == 0) {
         /* No address -- may be recvfrom() from known socket */
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     switch (addr->sa_family) {
@@ -2513,8 +2512,7 @@ static PyObject *
 sock_gettimeout(PySocketSockObject *s)
 {
     if (s->sock_timeout < 0) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     else {
         double seconds = _PyTime_AsSecondsDouble(s->sock_timeout);
@@ -2674,8 +2672,7 @@ sock_bind(PySocketSockObject *s, PyObject *addro)
     Py_END_ALLOW_THREADS
     if (res < 0)
         return s->errorhandler();
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(bind_doc,
@@ -2713,8 +2710,7 @@ sock_close(PySocketSockObject *s)
             return s->errorhandler();
         }
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(close_doc,
@@ -2971,8 +2967,7 @@ sock_listen(PySocketSockObject *s, PyObject *args)
     Py_END_ALLOW_THREADS
     if (res < 0)
         return s->errorhandler();
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(listen_doc,
@@ -3779,7 +3774,6 @@ sock_sendall(PySocketSockObject *s, PyObject *args)
     } while (len > 0);
     PyBuffer_Release(&pbuf);
 
-    Py_INCREF(Py_None);
     res = Py_None;
 
 done:
@@ -4336,8 +4330,7 @@ sock_shutdown(PySocketSockObject *s, PyObject *arg)
     Py_END_ALLOW_THREADS
     if (res < 0)
         return s->errorhandler();
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(shutdown_doc,
@@ -6141,8 +6134,7 @@ static PyObject *
 socket_getdefaulttimeout(PyObject *self)
 {
     if (defaulttimeout < 0) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     else {
         double seconds = _PyTime_AsSecondsDouble(defaulttimeout);
@@ -6167,8 +6159,7 @@ socket_setdefaulttimeout(PyObject *self, PyObject *arg)
 
     defaulttimeout = timeout;
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(setdefaulttimeout_doc,

@@ -61,8 +61,7 @@ Py_LOCAL_INLINE(PyObject *)
 SubString_new_object(SubString *str)
 {
     if (str->str == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     return PyUnicode_Substring(str->str, str->start, str->end);
 }

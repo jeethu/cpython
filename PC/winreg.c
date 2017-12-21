@@ -770,7 +770,6 @@ Reg2Py(BYTE *retDataBuf, DWORD retDataSize, DWORD typ)
            support it natively, we should handle the bits. */
         default:
             if (retDataSize == 0) {
-                Py_INCREF(Py_None);
                 obData = Py_None;
             }
             else

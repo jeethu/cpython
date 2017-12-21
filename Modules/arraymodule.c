@@ -707,11 +707,9 @@ array_richcompare(PyObject *v, PyObject *w, int op)
 
     /* We have an item that differs.  First, shortcuts for EQ/NE */
     if (op == Py_EQ) {
-        Py_INCREF(Py_False);
         res = Py_False;
     }
     else if (op == Py_NE) {
-        Py_INCREF(Py_True);
         res = Py_True;
     }
     else {
@@ -1023,8 +1021,7 @@ ins(arrayobject *self, Py_ssize_t where, PyObject *v)
 {
     if (ins1(self, where, v) != 0)
         return NULL;
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*[clinic input]
@@ -1138,8 +1135,7 @@ array_array_remove(arrayobject *self, PyObject *v)
         if (cmp > 0) {
             if (array_del_slice(self, i, i+1) != 0)
                 return NULL;
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
         else if (cmp < 0)
             return NULL;
@@ -1201,8 +1197,7 @@ array_array_extend(arrayobject *self, PyObject *bb)
 {
     if (array_do_extend(self, bb) == -1)
         return NULL;
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*[clinic input]
@@ -1331,8 +1326,7 @@ array_array_byteswap_impl(arrayobject *self)
                    "don't know how to byteswap this array type");
         return NULL;
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*[clinic input]
@@ -1365,8 +1359,7 @@ array_array_reverse_impl(arrayobject *self)
         }
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*[clinic input]
@@ -1469,8 +1462,7 @@ array_array_tofile(arrayobject *self, PyObject *f)
     }
 
   done:
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*[clinic input]
@@ -1507,8 +1499,7 @@ array_array_fromlist(arrayobject *self, PyObject *list)
             }
         }
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*[clinic input]
@@ -1573,8 +1564,7 @@ frombytes(arrayobject *self, Py_buffer *buffer)
             buffer->buf, n * itemsize);
     }
     PyBuffer_Release(buffer);
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*[clinic input]

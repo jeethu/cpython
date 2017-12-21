@@ -181,8 +181,6 @@ TESTNAME(PyObject *error(const char*))
         TYPENAME out;
         unsigned TYPENAME uout;
 
-        Py_INCREF(Py_None);
-
         out = F_PY_TO_S(Py_None);
         if (out != (TYPENAME)-1 || !PyErr_Occurred())
             return error("PyLong_AsXXX(None) didn't complain");
@@ -199,9 +197,7 @@ TESTNAME(PyObject *error(const char*))
                          "something other than TypeError");
         PyErr_Clear();
 
-        Py_DECREF(Py_None);
     }
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }

@@ -1972,7 +1972,6 @@ UnsetVar(PyObject *self, PyObject *args, int flags)
     if (code == TCL_ERROR)
         res = Tkinter_Error(self);
     else {
-        Py_INCREF(Py_None);
         res = Py_None;
     }
     LEAVE_OVERLAP_TCL

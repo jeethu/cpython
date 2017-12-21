@@ -1842,7 +1842,6 @@ statresult_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
        from the int slots.  */
     for (i = 7; i <= 9; i++) {
         if (result->ob_item[i+3] == Py_None) {
-            Py_DECREF(Py_None);
             Py_INCREF(result->ob_item[i]);
             result->ob_item[i+3] = result->ob_item[i];
         }
@@ -1878,8 +1877,7 @@ stat_float_times(PyObject* self, PyObject *args)
         /* Return old value */
         return PyBool_FromLong(_stat_float_times);
     _stat_float_times = newval;
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject *billion = NULL;
@@ -4698,7 +4696,6 @@ os_utime_impl(PyObject *module, path_t *path, PyObject *times, PyObject *ns,
 
 #endif /* MS_WINDOWS */
 
-    Py_INCREF(Py_None);
     return_value = Py_None;
 
 exit:
@@ -6212,8 +6209,7 @@ posix_initgroups(PyObject *self, PyObject *args)
     if (res == -1)
         return PyErr_SetFromErrno(PyExc_OSError);
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 #endif /* HAVE_INITGROUPS */
 
@@ -6276,8 +6272,7 @@ os_setpgrp_impl(PyObject *module)
     if (setpgrp() < 0)
 #endif /* SETPGRP_HAVE_ARG */
         return posix_error();
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 #endif /* HAVE_SETPGRP */
 
@@ -6461,7 +6456,6 @@ os_kill_impl(PyObject *module, pid_t pid, Py_ssize_t signal)
         err = GetLastError();
         result = PyErr_SetFromWindowsErr(err);
     } else {
-        Py_INCREF(Py_None);
         result = Py_None;
     }
 
@@ -6603,8 +6597,7 @@ os_setreuid_impl(PyObject *module, uid_t ruid, uid_t euid)
     if (setreuid(ruid, euid) < 0) {
         return posix_error();
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 #endif /* HAVE_SETREUID */
@@ -6702,8 +6695,7 @@ os_setgroups(PyObject *module, PyObject *groups)
 
     if (setgroups(len, grouplist) < 0)
         return posix_error();
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 #endif /* HAVE_SETGROUPS */
 

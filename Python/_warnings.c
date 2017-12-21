@@ -220,7 +220,6 @@ get_filter(PyObject *category, PyObject *text, Py_ssize_t lineno,
 
     action = get_default_action();
     if (action != NULL) {
-        Py_INCREF(Py_None);
         *item = Py_None;
         return action;
     }
@@ -892,7 +891,6 @@ warnings_warn_explicit(PyObject *self, PyObject *args, PyObject *kwds)
         if (!source)
             return NULL;
         else if (source == Py_None) {
-            Py_DECREF(Py_None);
             goto standard_call;
         }
 

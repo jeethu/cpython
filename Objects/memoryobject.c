@@ -133,7 +133,7 @@ mbuf_clear(_PyManagedBufferObject *self)
 }
 
 PyTypeObject _PyManagedBuffer_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "managedbuffer",
     sizeof(_PyManagedBufferObject),
     0,
@@ -3073,7 +3073,7 @@ static PyMethodDef memory_methods[] = {
 
 
 PyTypeObject PyMemoryView_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "memoryview",                             /* tp_name */
     offsetof(PyMemoryViewObject, ob_array),   /* tp_basicsize */
     sizeof(Py_ssize_t),                       /* tp_itemsize */

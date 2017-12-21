@@ -156,8 +156,7 @@ _DictRemover_call(PyObject *myself, PyObject *args, PyObject *kw)
         Py_CLEAR(self->key);
         Py_CLEAR(self->dict);
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyTypeObject DictRemover_Type = {
@@ -1049,8 +1048,7 @@ PyCPointerType_set_type(PyTypeObject *self, PyObject *type)
     if (-1 == PyDict_SetItemString((PyObject *)dict, "_type_", type))
         return NULL;
 
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static PyObject *_byref(PyObject *);
@@ -1570,8 +1568,7 @@ c_wchar_p_from_param(PyObject *type, PyObject *value)
     PyObject *as_parameter;
     int res;
     if (value == Py_None) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     if (PyUnicode_Check(value)) {
         PyCArgObject *parg;
@@ -1635,8 +1632,7 @@ c_char_p_from_param(PyObject *type, PyObject *value)
     PyObject *as_parameter;
     int res;
     if (value == Py_None) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     if (PyBytes_Check(value)) {
         PyCArgObject *parg;
@@ -1703,8 +1699,7 @@ c_void_p_from_param(PyObject *type, PyObject *value)
 
 /* None */
     if (value == Py_None) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
     /* Should probably allow buffer interface as well */
 /* int, long */
@@ -2467,7 +2462,6 @@ PyCData_GetContainer(CDataObject *self)
             if (self->b_objects == NULL)
                 return NULL;
         } else {
-            Py_INCREF(Py_None);
             self->b_objects = Py_None;
         }
     }
@@ -2534,7 +2528,6 @@ KeepRef(CDataObject *target, Py_ssize_t index, PyObject *keep)
 
 /* Optimization: no need to store None */
     if (keep == Py_None) {
-        Py_DECREF(Py_None);
         return 0;
     }
     ob = PyCData_GetContainer(target);
@@ -2690,8 +2683,7 @@ PyCData_setstate(PyObject *myself, PyObject *args)
     Py_DECREF(mydict);
     if (res == -1)
         return NULL;
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 /*
@@ -2913,8 +2905,7 @@ _PyCData_set(CDataObject *dst, PyObject *type, SETFUNC setfunc, PyObject *value,
             return result;
         } else if (value == Py_None && PyCPointerTypeObject_Check(type)) {
             *(void **)ptr = NULL;
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         } else {
             PyErr_Format(PyExc_TypeError,
                          "expected %s instance, got %s",
@@ -3068,8 +3059,7 @@ PyCFuncPtr_get_errcheck(PyCFuncPtrObject *self)
         Py_INCREF(self->errcheck);
         return self->errcheck;
     }
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static int
@@ -3107,8 +3097,7 @@ PyCFuncPtr_get_restype(PyCFuncPtrObject *self)
         Py_INCREF(dict->restype);
         return dict->restype;
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -3145,8 +3134,7 @@ PyCFuncPtr_get_argtypes(PyCFuncPtrObject *self)
         Py_INCREF(dict->argtypes);
         return dict->argtypes;
     } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 }
 
@@ -5370,7 +5358,6 @@ cast(void *ptr, PyObject *src, PyObject *ctype)
 
         /* But we need a dictionary! */
         if (obj->b_objects == Py_None) {
-            Py_DECREF(Py_None);
             obj->b_objects = PyDict_New();
             if (obj->b_objects == NULL)
                 goto failed;

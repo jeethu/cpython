@@ -205,7 +205,7 @@ PyDoc_STRVAR(namespace_doc,
 SimpleNamespace(**kwargs)");
 
 PyTypeObject _PyNamespace_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "types.SimpleNamespace",                    /* tp_name */
     sizeof(_PyNamespaceObject),                 /* tp_size */
     0,                                          /* tp_itemsize */

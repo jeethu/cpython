@@ -233,8 +233,7 @@ static PyObject *turnoff_sigfpe(PyObject *self,PyObject *args)
 #else
     fputs("Operation not implemented\n", stderr);
 #endif
-    Py_INCREF(Py_None);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 static void sigfpe_handler(int signo)

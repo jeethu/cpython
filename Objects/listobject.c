@@ -2281,12 +2281,10 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 
     /* We have an item that differs -- shortcuts for EQ/NE */
     if (op == Py_EQ) {
-        Py_INCREF(Py_False);
-        return Py_False;
+        Py_RETURN_FALSE;
     }
     if (op == Py_NE) {
-        Py_INCREF(Py_True);
-        return Py_True;
+        Py_RETURN_TRUE;
     }
 
     /* Compare the final item again using the proper operator */
@@ -2625,7 +2623,7 @@ static PyMappingMethods list_as_mapping = {
 };
 
 PyTypeObject PyList_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "list",
     sizeof(PyListObject),
     0,
@@ -2697,7 +2695,7 @@ static PyMethodDef listiter_methods[] = {
 };
 
 PyTypeObject PyListIter_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "list_iterator",                            /* tp_name */
     sizeof(listiterobject),                     /* tp_basicsize */
     0,                                          /* tp_itemsize */
@@ -2846,7 +2844,7 @@ static PyMethodDef listreviter_methods[] = {
 };
 
 PyTypeObject PyListRevIter_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "list_reverseiterator",                     /* tp_name */
     sizeof(listreviterobject),                  /* tp_basicsize */
     0,                                          /* tp_itemsize */

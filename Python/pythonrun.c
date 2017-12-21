@@ -1402,7 +1402,6 @@ err_input(perrdetail *err)
        Explicitly convert to an object. */
     if (!err->text) {
         errtext = Py_None;
-        Py_INCREF(Py_None);
     } else {
         errtext = PyUnicode_DecodeUTF8(err->text, err->offset,
                                        "replace");

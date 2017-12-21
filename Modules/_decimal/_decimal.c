@@ -112,15 +112,13 @@ static PyTypeObject PyDecContextManager_Type;
 Py_LOCAL_INLINE(PyObject *)
 incr_true(void)
 {
-    Py_INCREF(Py_True);
-    return Py_True;
+    Py_RETURN_TRUE;
 }
 
 Py_LOCAL_INLINE(PyObject *)
 incr_false(void)
 {
-    Py_INCREF(Py_False);
-    return Py_False;
+    Py_RETURN_FALSE;
 }
 
 
@@ -5853,11 +5851,9 @@ PyInit__decimal(void)
     /* Init module context */
     ASSIGN_PTR(module_context,
                PyObject_CallObject((PyObject *)&PyDecContext_Type, NULL));
-    Py_INCREF(Py_False);
     CHECK_INT(PyModule_AddObject(m, "HAVE_THREADS", Py_False));
 #else
     ASSIGN_PTR(tls_context_key, PyUnicode_FromString("___DECIMAL_CTX__"));
-    Py_INCREF(Py_True);
     CHECK_INT(PyModule_AddObject(m, "HAVE_THREADS", Py_True));
 #endif
 

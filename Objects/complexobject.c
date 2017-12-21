@@ -1100,7 +1100,7 @@ static PyNumberMethods complex_as_number = {
 };
 
 PyTypeObject PyComplex_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "complex",
     sizeof(PyComplexObject),
     0,

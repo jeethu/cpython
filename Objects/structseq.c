@@ -280,7 +280,7 @@ static PyMethodDef structseq_methods[] = {
 };
 
 static PyTypeObject _struct_sequence_template = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     NULL,                                       /* tp_name */
     sizeof(PyStructSequence) - sizeof(PyObject *), /* tp_basicsize */
     sizeof(PyObject *),                         /* tp_itemsize */

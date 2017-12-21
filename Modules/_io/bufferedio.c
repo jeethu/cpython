@@ -1049,7 +1049,6 @@ _buffered_readinto_generic(buffered *self, Py_buffer *buffer, char readinto1)
             break;
         if (n < 0) {
             if (n == -2) {
-                Py_INCREF(Py_None);
                 res = Py_None;
             }
             goto end;
@@ -1700,8 +1699,7 @@ _bufferedreader_read_generic(buffered *self, Py_ssize_t n)
                 return res;
             }
             Py_DECREF(res);
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
         remaining -= r;
         written += r;
@@ -1725,8 +1723,7 @@ _bufferedreader_read_generic(buffered *self, Py_ssize_t n)
                 return res;
             }
             Py_DECREF(res);
-            Py_INCREF(Py_None);
-            return Py_None;
+            Py_RETURN_NONE;
         }
         if (remaining > r) {
             memcpy(out + written, self->buffer + self->pos, r);

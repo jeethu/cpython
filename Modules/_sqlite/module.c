@@ -201,7 +201,6 @@ static PyObject* module_register_converter(PyObject* self, PyObject* args)
         goto error;
     }
 
-    Py_INCREF(Py_None);
     retval = Py_None;
 error:
     Py_XDECREF(name);

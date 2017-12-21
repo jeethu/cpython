@@ -23,8 +23,7 @@ ellipsis_new(PyTypeObject *type, PyObject *args, PyObject *kwargs)
         PyErr_SetString(PyExc_TypeError, "EllipsisType takes no arguments");
         return NULL;
     }
-    Py_INCREF(Py_Ellipsis);
-    return Py_Ellipsis;
+    Py_RETURN_ELLIPSIS;
 }
 
 static PyObject *
@@ -45,7 +44,7 @@ static PyMethodDef ellipsis_methods[] = {
 };
 
 PyTypeObject PyEllipsis_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "ellipsis",                         /* tp_name */
     0,                                  /* tp_basicsize */
     0,                                  /* tp_itemsize */
@@ -87,7 +86,7 @@ PyTypeObject PyEllipsis_Type = {
 
 PyObject _Py_EllipsisObject = {
     _PyObject_EXTRA_INIT
-    1, &PyEllipsis_Type
+    _Py_REF_MAX, &PyEllipsis_Type
 };
 
 
@@ -630,7 +629,7 @@ slice_traverse(PySliceObject *v, visitproc visit, void *arg)
 }
 
 PyTypeObject PySlice_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "slice",                    /* Name of this type */
     sizeof(PySliceObject),      /* Basic object size */
     0,                          /* Item size for varobject */

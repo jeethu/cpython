@@ -21,7 +21,7 @@ static PyMemberDef module_members[] = {
 };
 
 PyTypeObject PyModuleDef_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "moduledef",                                /* tp_name */
     sizeof(struct PyModuleDef),                 /* tp_size */
     0,                                          /* tp_itemsize */
@@ -738,7 +738,7 @@ Create a module object.\n\
 The name must be a string; the optional doc argument can have any type.");
 
 PyTypeObject PyModule_Type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "module",                                   /* tp_name */
     sizeof(PyModuleObject),                     /* tp_size */
     0,                                          /* tp_itemsize */

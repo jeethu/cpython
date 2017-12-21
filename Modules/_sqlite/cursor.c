@@ -48,10 +48,8 @@ static int pysqlite_cursor_init(pysqlite_Cursor* self, PyObject* args, PyObject*
         return -1;
     }
 
-    Py_INCREF(Py_None);
     Py_XSETREF(self->description, Py_None);
 
-    Py_INCREF(Py_None);
     Py_XSETREF(self->lastrowid, Py_None);
 
     self->arraysize = 1;
@@ -60,7 +58,6 @@ static int pysqlite_cursor_init(pysqlite_Cursor* self, PyObject* args, PyObject*
 
     self->rowcount = -1L;
 
-    Py_INCREF(Py_None);
     Py_XSETREF(self->row_factory, Py_None);
 
     if (!pysqlite_check_thread(self->connection)) {
@@ -265,7 +262,6 @@ PyObject* _pysqlite_fetch_one_row(pysqlite_Cursor* self)
             nbytes = sqlite3_column_bytes(self->statement->st, i);
             val_str = (const char*)sqlite3_column_blob(self->statement->st, i);
             if (!val_str) {
-                Py_INCREF(Py_None);
                 converted = Py_None;
             } else {
                 item = PyBytes_FromStringAndSize(val_str, nbytes);
@@ -281,7 +277,6 @@ PyObject* _pysqlite_fetch_one_row(pysqlite_Cursor* self)
             coltype = sqlite3_column_type(self->statement->st, i);
             Py_END_ALLOW_THREADS
             if (coltype == SQLITE_NULL) {
-                Py_INCREF(Py_None);
                 converted = Py_None;
             } else if (coltype == SQLITE_INTEGER) {
                 converted = _pysqlite_long_from_int64(sqlite3_column_int64(self->statement->st, i));
@@ -335,7 +330,6 @@ PyObject* _pysqlite_fetch_one_row(pysqlite_Cursor* self)
         if (converted) {
             PyTuple_SetItem(row, i, converted);
         } else {
-            Py_INCREF(Py_None);
             PyTuple_SetItem(row, i, Py_None);
         }
     }
@@ -469,7 +463,6 @@ PyObject* _pysqlite_query_execute(pysqlite_Cursor* self, int multiple, PyObject*
         goto error;
 
     /* reset description and rowcount */
-    Py_INCREF(Py_None);
     Py_SETREF(self->description, Py_None);
     self->rowcount = 0L;
 
@@ -596,12 +589,12 @@ PyObject* _pysqlite_query_execute(pysqlite_Cursor* self, int multiple, PyObject*
                         goto error;
                     }
                     PyTuple_SetItem(descriptor, 0, _pysqlite_build_column_name(sqlite3_column_name(self->statement->st, i)));
-                    Py_INCREF(Py_None); PyTuple_SetItem(descriptor, 1, Py_None);
-                    Py_INCREF(Py_None); PyTuple_SetItem(descriptor, 2, Py_None);
-                    Py_INCREF(Py_None); PyTuple_SetItem(descriptor, 3, Py_None);
-                    Py_INCREF(Py_None); PyTuple_SetItem(descriptor, 4, Py_None);
-                    Py_INCREF(Py_None); PyTuple_SetItem(descriptor, 5, Py_None);
-                    Py_INCREF(Py_None); PyTuple_SetItem(descriptor, 6, Py_None);
+                    PyTuple_SetItem(descriptor, 1, Py_None);
+                    PyTuple_SetItem(descriptor, 2, Py_None);
+                    PyTuple_SetItem(descriptor, 3, Py_None);
+                    PyTuple_SetItem(descriptor, 4, Py_None);
+                    PyTuple_SetItem(descriptor, 5, Py_None);
+                    PyTuple_SetItem(descriptor, 6, Py_None);
                     PyTuple_SetItem(self->description, i, descriptor);
                 }
             }

@@ -28,6 +28,9 @@ typedef struct {
 PyAPI_DATA(PyTypeObject) PySlice_Type;
 PyAPI_DATA(PyTypeObject) PyEllipsis_Type;
 
+/* Macro for returning Py_Ellipsis from a function */
+#define Py_RETURN_ELLIPSIS return Py_Ellipsis
+
 #define PySlice_Check(op) (Py_TYPE(op) == &PySlice_Type)
 
 PyAPI_FUNC(PyObject *) PySlice_New(PyObject* start, PyObject* stop,

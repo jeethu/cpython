@@ -615,7 +615,7 @@ static PyGetSetDef ast_type_getsets[] = {
 };
 
 static PyTypeObject AST_type = {
-    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    PyVarObject_LONGLIVED_HEAD_INIT(&PyType_Type, 0)
     "_ast.AST",
     sizeof(AST_object),
     0,
@@ -2585,8 +2585,7 @@ ast2obj_mod(void* _o)
     mod_ty o = (mod_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     switch (o->kind) {
@@ -2640,8 +2639,7 @@ ast2obj_stmt(void* _o)
     stmt_ty o = (stmt_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     switch (o->kind) {
@@ -3065,8 +3063,7 @@ ast2obj_expr(void* _o)
     expr_ty o = (expr_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     switch (o->kind) {
@@ -3528,8 +3525,7 @@ ast2obj_slice(void* _o)
     slice_ty o = (slice_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     switch (o->kind) {
@@ -3707,8 +3703,7 @@ ast2obj_comprehension(void* _o)
     comprehension_ty o = (comprehension_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     result = PyType_GenericNew(comprehension_type, NULL, NULL);
@@ -3746,8 +3741,7 @@ ast2obj_excepthandler(void* _o)
     excepthandler_ty o = (excepthandler_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     switch (o->kind) {
@@ -3794,8 +3788,7 @@ ast2obj_arguments(void* _o)
     arguments_ty o = (arguments_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     result = PyType_GenericNew(arguments_type, NULL, NULL);
@@ -3843,8 +3836,7 @@ ast2obj_arg(void* _o)
     arg_ty o = (arg_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     result = PyType_GenericNew(arg_type, NULL, NULL);
@@ -3882,8 +3874,7 @@ ast2obj_keyword(void* _o)
     keyword_ty o = (keyword_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     result = PyType_GenericNew(keyword_type, NULL, NULL);
@@ -3911,8 +3902,7 @@ ast2obj_alias(void* _o)
     alias_ty o = (alias_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     result = PyType_GenericNew(alias_type, NULL, NULL);
@@ -3940,8 +3930,7 @@ ast2obj_withitem(void* _o)
     withitem_ty o = (withitem_ty)_o;
     PyObject *result = NULL, *value = NULL;
     if (!o) {
-        Py_INCREF(Py_None);
-        return Py_None;
+        Py_RETURN_NONE;
     }
 
     result = PyType_GenericNew(withitem_type, NULL, NULL);
