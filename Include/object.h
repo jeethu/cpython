@@ -788,6 +788,7 @@ PyAPI_FUNC(void) _Py_Dealloc(PyObject *);
 #endif
 #endif /* !Py_TRACE_REFS */
 
+#ifndef __GNUC__
 #define Py_INCREF(op)                                    \
     do {                                                 \
         _Py_INC_REFTOTAL;                                \
@@ -796,6 +797,17 @@ PyAPI_FUNC(void) _Py_Dealloc(PyObject *);
             _py_incref_tmp->ob_refcnt++;                 \
     } while (0)
 
+#else
+#define Py_INCREF(op)                                                           \
+    do {                                                                        \
+        _Py_INC_REFTOTAL;                                                       \
+        PyObject *_py_incref_tmp = (PyObject *)(op);                            \
+        if (__builtin_expect((_py_incref_tmp->ob_refcnt != _Py_REF_MAX), 1))  \
+            _py_incref_tmp->ob_refcnt++;                                        \
+    } while (0)
+#endif
+
+#ifndef __GNUC__
 #define Py_DECREF(op)                                   \
     do {                                                \
         PyObject *_py_decref_tmp = (PyObject *)(op);    \
@@ -807,6 +819,19 @@ PyAPI_FUNC(void) _Py_Dealloc(PyObject *);
                 _Py_Dealloc(_py_decref_tmp);            \
         }                                               \
     } while (0)
+#else
+#define Py_DECREF(op)                                                            \
+    do {                                                                         \
+        PyObject *_py_decref_tmp = (PyObject *)(op);                             \
+        if (__builtin_expect((_py_decref_tmp->ob_refcnt != _Py_REF_MAX), 1)) { \
+            if (_Py_DEC_REFTOTAL  _Py_REF_DEBUG_COMMA                            \
+            --(_py_decref_tmp)->ob_refcnt != 0)                                  \
+                _Py_CHECK_REFCNT(_py_decref_tmp)                                 \
+            else                                                                 \
+                _Py_Dealloc(_py_decref_tmp);                                     \
+        }                                                                        \
+    } while (0)
+#endif
 
 /* Safely decref `op` and set `op` to NULL, especially useful in tp_clear
  * and tp_dealloc implementations.
