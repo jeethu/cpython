@@ -114,6 +114,7 @@ converting the dict to the combined table.
 #include "internal/pystate.h"
 #include "dict-common.h"
 #include "stringlib/eq.h"    /* to get unicode_eq() */
+#include "internal/intrpow2.h"
 
 /*[clinic input]
 class dict "PyDictObject *" "&PyDict_Type"
@@ -604,7 +605,7 @@ new_dict_with_shared_keys(PyDictKeysObject *keys)
     Py_ssize_t i, size;
 
     size = USABLE_FRACTION(DK_SIZE(keys));
-    values = new_values(size);
+    values = (PyObject **)PyMem_Calloc(sizeof(PyObject *), size);
     if (values == NULL) {
         DK_DECREF(keys);
         return PyErr_NoMemory();
@@ -1068,10 +1069,16 @@ dictresize(PyDictObject *mp, Py_ssize_t minsize)
     PyDictKeyEntry *oldentries, *newentries;
 
     /* Find the smallest table size > minused. */
+#ifdef INTRINSIC_NEAREST_POWER_OF_TWO
+    newsize = INTRINSIC_NEAREST_POWER_OF_TWO(minsize);
+    if (newsize > 0 && newsize < PyDict_MINSIZE)
+        newsize = PyDict_MINSIZE;
+#else
     for (newsize = PyDict_MINSIZE;
          newsize < minsize && newsize > 0;
          newsize <<= 1)
         ;
+#endif
     if (newsize <= 0) {
         PyErr_NoMemory();
         return -1;
@@ -1210,10 +1217,16 @@ _PyDict_NewPresized(Py_ssize_t minused)
     }
     else {
         Py_ssize_t minsize = ESTIMATE_SIZE(minused);
+#ifdef INTRINSIC_NEAREST_POWER_OF_TWO
+        newsize = INTRINSIC_NEAREST_POWER_OF_TWO(minsize);
+        if (newsize > 0 && newsize < PyDict_MINSIZE)
+            newsize = PyDict_MINSIZE;
+#else
         newsize = PyDict_MINSIZE;
         while (newsize < minsize) {
             newsize <<= 1;
         }
+#endif
     }
     assert(IS_POWER_OF_2(newsize));
 

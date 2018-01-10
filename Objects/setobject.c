@@ -34,6 +34,7 @@
 #include "Python.h"
 #include "internal/pystate.h"
 #include "structmember.h"
+#include "internal/intrpow2.h"
 
 /* Object used as dummy key to fill deleted entries */
 static PyObject _dummy_struct;
@@ -313,10 +314,16 @@ set_table_resize(PySetObject *so, Py_ssize_t minused)
 
     /* Find the smallest table size > minused. */
     /* XXX speed-up with intrinsics */
+#ifdef INTRINSIC_NEAREST_POWER_OF_TWO
+    newsize = INTRINSIC_NEAREST_POWER_OF_TWO(minused);
+    if (newsize > 0 && newsize < PySet_MINSIZE)
+        newsize = PySet_MINSIZE;
+#else
     for (newsize = PySet_MINSIZE;
          newsize <= minused && newsize > 0;
          newsize <<= 1)
         ;
+#endif
     if (newsize <= 0) {
         PyErr_NoMemory();
         return -1;
