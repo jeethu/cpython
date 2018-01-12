@@ -5,6 +5,8 @@
 #include "internal/pystate.h"
 #include "accu.h"
 
+#include "internal/incref_multi.h"
+
 /*[clinic input]
 class tuple "PyTupleObject *" "&PyTuple_Type"
 [clinic start generated code]*/
@@ -514,11 +516,11 @@ tuplerepeat(PyTupleObject *a, Py_ssize_t n)
     p = np->ob_item;
     items = a->ob_item;
     for (i = 0; i < n; i++) {
-        for (j = 0; j < Py_SIZE(a); j++) {
-            *p = items[j];
-            Py_INCREF(*p);
-            p++;
-        }
+        for (j = 0; j < Py_SIZE(a); j++)
+            *p++ = items[j];
+    }
+    for (i = 0; i < Py_SIZE(a); i++) {
+        Py_INCREF_MULTI(items[i], n);
     }
     return (PyObject *) np;
 }

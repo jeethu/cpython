@@ -10,6 +10,8 @@
 #include <sys/types.h>          /* For size_t */
 #endif
 
+#include "internal/incref_multi.h"
+
 /*[clinic input]
 class list "PyListObject *" "&PyList_Type"
 [clinic start generated code]*/
@@ -525,18 +527,18 @@ list_repeat(PyListObject *a, Py_ssize_t n)
         elem = a->ob_item[0];
         for (i = 0; i < n; i++) {
             items[i] = elem;
-            Py_INCREF(elem);
         }
+        Py_INCREF_MULTI(elem, n);
         return (PyObject *) np;
     }
     p = np->ob_item;
     items = a->ob_item;
     for (i = 0; i < n; i++) {
-        for (j = 0; j < Py_SIZE(a); j++) {
-            *p = items[j];
-            Py_INCREF(*p);
-            p++;
-        }
+        for (j = 0; j < Py_SIZE(a); j++)
+            *p++ = items[j];
+    }
+    for (i = 0; i < Py_SIZE(a); i++) {
+        Py_INCREF_MULTI(items[i], n);
     }
     return (PyObject *) np;
 }
