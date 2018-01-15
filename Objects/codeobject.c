@@ -3,6 +3,7 @@
 #include "Python.h"
 #include "code.h"
 #include "structmember.h"
+#include "dict-common.h"
 
 /* Holder for co_extra information */
 typedef struct {
@@ -206,6 +207,10 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
     co->co_extra = NULL;
+    if(PyTuple_GET_SIZE(names) == 0)
+        co->co_global_lookups = -1;
+    else
+        co->co_global_lookups = 0;
     return co;
 }
 
@@ -888,4 +893,151 @@ _PyCode_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
 
     co_extra->ce_extras[index] = extra;
     return 0;
+}
+
+/* Number of calls, after which to start caching global lookup */
+
+#define GLOBAL_CACHE_THRESHOLD 32
+
+#define SHOULD_USE_GLOBAL_CACHE(code) (code->co_global_lookups >= 0)
+#define REACHED_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups == \
+                                               GLOBAL_CACHE_THRESHOLD)
+
+/* Tuple access macros */
+
+#ifndef Py_DEBUG
+#define GETITEM(v, i) PyTuple_GET_ITEM((PyTupleObject *)(v), (i))
+#else
+#define GETITEM(v, i) PyTuple_GetItem((v), (i))
+#endif
+
+static Py_ssize_t _globalscache_index = -1;
+
+static inline int
+_PyCode_GetGlobalCache(PyCodeObject* code, _PyGlobalLookupCache **cache) {
+    if(_globalscache_index < 0) {
+        _globalscache_index = _PyEval_RequestCodeExtraIndex((freefunc)
+                                                            PyMem_Free);
+    }
+    return _PyCode_GetExtra((PyObject*)code, _globalscache_index,
+                            (void**)cache);
+}
+
+static inline int
+_PyCode_SetGlobalCache(PyCodeObject* code, _PyGlobalLookupCache* cache) {
+    if(_globalscache_index < 0) {
+        _globalscache_index = _PyEval_RequestCodeExtraIndex((freefunc)
+                                                            PyMem_Free);
+    }
+    return _PyCode_SetExtra((PyObject*)code, _globalscache_index,
+                            (void*)cache);
+}
+
+static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
+                                      PyDictObject *builtins, PyObject* value,
+                                      int offset, _PyGlobalLookupCacheType tp) {
+    _PyGlobalLookupCache *globals_cache = NULL;
+    if(code->co_global_lookups < GLOBAL_CACHE_THRESHOLD)
+        code->co_global_lookups++;
+    else if(code->co_global_lookups == GLOBAL_CACHE_THRESHOLD) {
+        if(_PyCode_GetGlobalCache(code, &globals_cache) < 0)
+            return -1;
+        if(globals_cache == NULL) {
+            Py_ssize_t n_globals = PyTuple_GET_SIZE(code->co_names);
+            globals_cache = (_PyGlobalLookupCache*)\
+                            PyMem_Calloc(n_globals,
+                                         sizeof(_PyGlobalLookupCache));
+            if(globals_cache == NULL)
+                return -1;
+            if(_PyCode_SetGlobalCache(code, globals_cache) < 0)
+                return -1;
+        }
+        globals_cache += offset;
+        globals_cache->obj = value;
+        globals_cache->version_tag = globals->ma_version_tag;
+        if(tp == GCACHE_GLOBALS) {
+            globals_cache->type = GCACHE_GLOBALS;
+        }
+        else {
+            globals_cache->type = GCACHE_BUILTINS;
+            if(builtins->ma_version_tag > globals_cache->version_tag)
+                globals_cache->version_tag = builtins->ma_version_tag;
+        }
+    }
+    return 0;
+}
+
+/* Fast version of global value lookup (LOAD_GLOBAL).
+ * Lookup in globals, then builtins.
+ *
+ * Raise an exception and return NULL if an error occurred (ex: computing the
+ * key hash failed, key comparison failed, ...). Return NULL if the key doesn't
+ * exist. Return the value if the key exists.
+ */
+PyObject* _Py_HOT_FUNCTION
+_PyCode_LoadGlobalCached(PyCodeObject *code,
+                         PyDictObject *globals, PyDictObject *builtins,
+                         int offset) {
+    Py_ssize_t ix;
+    Py_hash_t hash;
+    PyObject *key, *value;
+    _PyGlobalLookupCache *globals_cache;
+    uint16_t version_tag;
+
+    if(SHOULD_USE_GLOBAL_CACHE(code) && REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
+        if(_PyCode_GetGlobalCache(code, &globals_cache) < 0)
+            return NULL;
+        if(globals_cache != NULL) {
+            assert(offset >= 0 && offset < PyTuple_Size(code->co_names));
+            globals_cache += offset;
+            if(globals_cache->type == GCACHE_GLOBALS) {
+                if(globals_cache->version_tag == globals->ma_version_tag) {
+                    return globals_cache->obj;
+                }
+            }
+            else if(globals_cache->type == GCACHE_BUILTINS) {
+                version_tag = globals->ma_version_tag;
+                if(builtins->ma_version_tag > version_tag)
+                    version_tag = builtins->ma_version_tag;
+                if(globals_cache->version_tag == version_tag) {
+                    return globals_cache->obj;
+                }
+            }
+            globals_cache->type = GCACHE_UNITIALIZED;
+        }
+    }
+
+    key = GETITEM(code->co_names, offset);
+    if (!PyUnicode_CheckExact(key) ||
+        (hash = ((PyASCIIObject *) key)->hash) == -1)
+    {
+        hash = PyObject_Hash(key);
+        if (hash == -1)
+            return NULL;
+    }
+
+    /* namespace 1: globals */
+    ix = globals->ma_keys->dk_lookup(globals, key, hash, &value);
+    if (ix == DKIX_ERROR)
+        return NULL;
+    if (ix != DKIX_EMPTY && value != NULL) {
+        if(SHOULD_USE_GLOBAL_CACHE(code) && _PyCode_CacheGlobal(code, globals, builtins,
+                                                                value, offset,
+                                                                GCACHE_GLOBALS) == -1)
+            return NULL;
+        return value;
+    }
+
+    /* namespace 2: builtins */
+    ix = builtins->ma_keys->dk_lookup(builtins, key, hash, &value);
+    if (ix < 0)
+        return NULL;
+
+    if(ix != DKIX_EMPTY && value != NULL) {
+        if(SHOULD_USE_GLOBAL_CACHE(code) && _PyCode_CacheGlobal(code, globals, builtins,
+                                                                value, offset,
+                                                                GCACHE_BUILTINS) == -1)
+            return NULL;
+    }
+    return value;
 }
