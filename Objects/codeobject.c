@@ -895,13 +895,32 @@ _PyCode_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
     return 0;
 }
 
+
+/*
+ * Helpers for the LOAD_GLOBAL caching function _PyCode_LoadGlobalCached
+ */
+
 /* Number of calls, after which to start caching global lookup */
-
 #define GLOBAL_CACHE_THRESHOLD 32
-
 #define SHOULD_USE_GLOBAL_CACHE(code) (code->co_global_lookups >= 0)
+#define UNDER_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups < \
+                                             GLOBAL_CACHE_THRESHOLD)
 #define REACHED_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups == \
                                                GLOBAL_CACHE_THRESHOLD)
+
+typedef enum {
+    GCACHE_UNITIALIZED=0,
+    GCACHE_GLOBALS,
+    GCACHE_BUILTINS
+} _Py_GlobalLookupCacheEntryType;
+
+/* Global lookup cache entry */
+
+typedef struct {
+    uint64_t version_tag;
+    _Py_GlobalLookupCacheEntryType type;
+    PyObject *obj;
+} _Py_GlobalLookupCacheEntry;
 
 /* Tuple access macros */
 
@@ -914,7 +933,7 @@ _PyCode_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
 static Py_ssize_t _globalscache_index = -1;
 
 static inline int
-_PyCode_GetGlobalCache(PyCodeObject* code, _PyGlobalLookupCache **cache) {
+_PyCode_GetGlobalCache(PyCodeObject* code, _Py_GlobalLookupCacheEntry **cache) {
     if(_globalscache_index < 0) {
         _globalscache_index = _PyEval_RequestCodeExtraIndex((freefunc)
                                                             PyMem_Free);
@@ -924,7 +943,7 @@ _PyCode_GetGlobalCache(PyCodeObject* code, _PyGlobalLookupCache **cache) {
 }
 
 static inline int
-_PyCode_SetGlobalCache(PyCodeObject* code, _PyGlobalLookupCache* cache) {
+_PyCode_SetGlobalCache(PyCodeObject* code, _Py_GlobalLookupCacheEntry* cache) {
     if(_globalscache_index < 0) {
         _globalscache_index = _PyEval_RequestCodeExtraIndex((freefunc)
                                                             PyMem_Free);
@@ -935,18 +954,19 @@ _PyCode_SetGlobalCache(PyCodeObject* code, _PyGlobalLookupCache* cache) {
 
 static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
                                       PyDictObject *builtins, PyObject* value,
-                                      int offset, _PyGlobalLookupCacheType tp) {
-    _PyGlobalLookupCache *globals_cache = NULL;
-    if(code->co_global_lookups < GLOBAL_CACHE_THRESHOLD)
+                                      int offset,
+                                      _Py_GlobalLookupCacheEntryType tp) {
+    _Py_GlobalLookupCacheEntry *globals_cache = NULL;
+    if(UNDER_GLOBAL_LOOKUP_THRESHOLD(code))
         code->co_global_lookups++;
-    else if(code->co_global_lookups == GLOBAL_CACHE_THRESHOLD) {
+    else if(REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
         if(_PyCode_GetGlobalCache(code, &globals_cache) < 0)
             return -1;
         if(globals_cache == NULL) {
             Py_ssize_t n_globals = PyTuple_GET_SIZE(code->co_names);
-            globals_cache = (_PyGlobalLookupCache*)\
+            globals_cache = (_Py_GlobalLookupCacheEntry*)\
                             PyMem_Calloc(n_globals,
-                                         sizeof(_PyGlobalLookupCache));
+                                         sizeof(_Py_GlobalLookupCacheEntry));
             if(globals_cache == NULL)
                 return -1;
             if(_PyCode_SetGlobalCache(code, globals_cache) < 0)
@@ -968,7 +988,9 @@ static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
 }
 
 /* Fast version of global value lookup (LOAD_GLOBAL).
- * Lookup in globals, then builtins.
+ * Lookup in globals, then builtins and cache the
+ * lookup result in code->co_extra if the number of lookups exceeds
+ * GLOBAL_CACHE_THRESHOLD
  *
  * Raise an exception and return NULL if an error occurred (ex: computing the
  * key hash failed, key comparison failed, ...). Return NULL if the key doesn't
@@ -981,7 +1003,7 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
     Py_ssize_t ix;
     Py_hash_t hash;
     PyObject *key, *value;
-    _PyGlobalLookupCache *globals_cache;
+    _Py_GlobalLookupCacheEntry *globals_cache;
     uint16_t version_tag;
 
     if(SHOULD_USE_GLOBAL_CACHE(code) && REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {

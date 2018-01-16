@@ -17,20 +17,6 @@ typedef uint16_t _Py_CODEUNIT;
 #  define _Py_OPARG(word) ((word) >> 8)
 #endif
 
-/* Global lookup cache */
-
-typedef enum {
-    GCACHE_UNITIALIZED=0,
-    GCACHE_GLOBALS,
-    GCACHE_BUILTINS
-} _PyGlobalLookupCacheType;
-
-typedef struct {
-    uint64_t version_tag;
-    _PyGlobalLookupCacheType type;
-    PyObject *obj;
-} _PyGlobalLookupCache;
-
 /* Bytecode object */
 typedef struct {
     PyObject_HEAD
