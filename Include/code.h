@@ -49,9 +49,7 @@ typedef struct {
        Type is a void* to keep the format private in codeobject.c to force
        people to go through the proper APIs. */
     void *co_extra;
-
-    int co_global_lookups;      /* Number of global lookups */
-    void *co_globals_cache;     /* Structure to hold cached values */
+    void *co_globals_cache;     /* to hold cached global value lookups */
 
 } PyCodeObject;
 

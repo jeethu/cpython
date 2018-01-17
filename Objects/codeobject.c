@@ -207,7 +207,6 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
     co->co_extra = NULL;
-    co->co_global_lookups = 0;
     co->co_globals_cache = NULL;
     return co;
 }
@@ -415,6 +414,32 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
     return co;
 }
 
+/*
+ * Array of sentinel values
+ * pointers into this array are used to
+ * encode the number of lookups and the pointer
+ * to the cache structure in the same value.
+ * value as the
+ */
+
+static const int _Py_GlobalLookup_Sentinel_Array[] = {
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+};
+
+#define IS_Py_GlobalLookup_SENTINEL(x) (x == NULL ||                             \
+                        ((void*)x >= (void*)&_Py_GlobalLookup_Sentinel_Array &&  \
+                        (void*)x <= (void*)&_Py_GlobalLookup_Sentinel_Array[     \
+                                sizeof(_Py_GlobalLookup_Sentinel_Array)          \
+                                / sizeof(_Py_GlobalLookup_Sentinel_Array[0])]    \
+                          ))
+
 static void
 code_dealloc(PyCodeObject *co)
 {
@@ -448,8 +473,9 @@ code_dealloc(PyCodeObject *co)
         PyObject_GC_Del(co->co_zombieframe);
     if (co->co_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject*)co);
-    if (co->co_globals_cache != NULL)
+    if (!IS_Py_GlobalLookup_SENTINEL(co->co_globals_cache)) {
         PyMem_FREE(co->co_globals_cache);
+    }
     PyObject_DEL(co);
 }
 
@@ -900,13 +926,8 @@ _PyCode_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
  * Helpers for the LOAD_GLOBAL caching function _PyCode_LoadGlobalCached
  */
 
-/* Number of calls, after which to start caching global lookup */
-#define GLOBAL_CACHE_THRESHOLD 32
-#define SHOULD_USE_GLOBAL_CACHE(code) (code->co_global_lookups >= 0)
-#define UNDER_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups < \
-                                             GLOBAL_CACHE_THRESHOLD)
-#define REACHED_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups == \
-                                               GLOBAL_CACHE_THRESHOLD)
+/* Number of calls, after which to start caching global lookups */
+#define GLOBAL_CACHE_THRESHOLD 64
 
 typedef enum {
     GCACHE_UNITIALIZED=0,
@@ -922,16 +943,37 @@ typedef struct {
     PyObject *obj;
 } _Py_GlobalLookupCacheEntry;
 
-static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
-                                      PyDictObject *builtins, PyObject* value,
-                                      int offset,
+#define UNDER_GLOBAL_LOOKUP_THRESHOLD(code)                                 \
+    (code->co_globals_cache == NULL  ||                                     \
+     (code->co_globals_cache >= (void*)&_Py_GlobalLookup_Sentinel_Array &&  \
+     code->co_globals_cache < (void*)&_Py_GlobalLookup_Sentinel_Array[      \
+        GLOBAL_CACHE_THRESHOLD - 1]))
+
+#define REACHED_GLOBAL_LOOKUP_THRESHOLD(code) (                \
+    !IS_Py_GlobalLookup_SENTINEL(code->co_globals_cache) ||    \
+    code->co_globals_cache ==                                  \
+    &_Py_GlobalLookup_Sentinel_Array[GLOBAL_CACHE_THRESHOLD])
+
+#define INCREMENT_GLOBAL_LOOKUP_COUNTER(code) do {                     \
+    int *tmp = (int*)code->co_globals_cache;                           \
+    if(tmp == NULL)                                                    \
+        code->co_globals_cache =                                       \
+            (void*)&_Py_GlobalLookup_Sentinel_Array[1];                \
+    else                                                               \
+        code->co_globals_cache += sizeof(void*);                       \
+    } while(0)
+
+static inline int _PyCode_CacheGlobal(PyCodeObject *code,
+                                      PyDictObject *globals,
+                                      PyDictObject *builtins,
+                                      PyObject* value, int offset,
                                       _Py_GlobalLookupCacheEntryType tp) {
     _Py_GlobalLookupCacheEntry *globals_cache = NULL;
-    if(UNDER_GLOBAL_LOOKUP_THRESHOLD(code))
-        code->co_global_lookups++;
-    else if(REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
+    if(UNDER_GLOBAL_LOOKUP_THRESHOLD(code)) {
+        INCREMENT_GLOBAL_LOOKUP_COUNTER(code);
+    } else {
         globals_cache = code->co_globals_cache;
-        if(globals_cache == NULL) {
+        if(IS_Py_GlobalLookup_SENTINEL(globals_cache)) {
             Py_ssize_t n_globals = PyTuple_GET_SIZE(code->co_names);
             globals_cache = (_Py_GlobalLookupCacheEntry*)\
                             PyMem_Calloc(n_globals,
@@ -972,23 +1014,26 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
     Py_hash_t hash;
     PyObject *key, *value;
     _Py_GlobalLookupCacheEntry *globals_cache;
-    uint16_t version_tag;
 
-    if(SHOULD_USE_GLOBAL_CACHE(code) && REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
+    assert(sizeof(_Py_GlobalLookup_Sentinel_Array)
+           / sizeof(_Py_GlobalLookup_Sentinel_Array[0])
+           == GLOBAL_CACHE_THRESHOLD);
+
+    if (REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
         globals_cache = code->co_globals_cache;
-        if(globals_cache != NULL) {
+        if (globals_cache != NULL) {
             assert(offset >= 0 && offset < PyTuple_Size(code->co_names));
             globals_cache += offset;
-            if(globals_cache->type == GCACHE_GLOBALS) {
-                if(globals_cache->version_tag == globals->ma_version_tag) {
+            if (globals_cache->type == GCACHE_GLOBALS) {
+                if (globals_cache->version_tag == globals->ma_version_tag) {
                     return globals_cache->obj;
                 }
             }
-            else if(globals_cache->type == GCACHE_BUILTINS) {
-                version_tag = globals->ma_version_tag;
-                if(builtins->ma_version_tag > version_tag)
+            else if (globals_cache->type == GCACHE_BUILTINS) {
+                uint64_t version_tag = globals->ma_version_tag;
+                if (builtins->ma_version_tag > version_tag)
                     version_tag = builtins->ma_version_tag;
-                if(globals_cache->version_tag == version_tag)
+                if (globals_cache->version_tag == version_tag)
                     return globals_cache->obj;
             }
             globals_cache->type = GCACHE_UNITIALIZED;
@@ -997,8 +1042,7 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
 
     key = PyTuple_GET_ITEM(code->co_names, offset);
     if (!PyUnicode_CheckExact(key) ||
-        (hash = ((PyASCIIObject *) key)->hash) == -1)
-    {
+        (hash = ((PyASCIIObject *) key)->hash) == -1) {
         hash = PyObject_Hash(key);
         if (hash == -1)
             return NULL;
@@ -1009,9 +1053,8 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
     if (ix == DKIX_ERROR)
         return NULL;
     if (ix != DKIX_EMPTY && value != NULL) {
-        if(SHOULD_USE_GLOBAL_CACHE(code) && _PyCode_CacheGlobal(code, globals, builtins,
-                                                                value, offset,
-                                                                GCACHE_GLOBALS) == -1)
+        if (_PyCode_CacheGlobal(code, globals, builtins,
+                               value, offset, GCACHE_GLOBALS) == -1)
             return NULL;
         return value;
     }
@@ -1021,11 +1064,9 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
     if (ix < 0)
         return NULL;
 
-    if(ix != DKIX_EMPTY && value != NULL) {
-        if(SHOULD_USE_GLOBAL_CACHE(code) && _PyCode_CacheGlobal(code, globals, builtins,
-                                                                value, offset,
-                                                                GCACHE_BUILTINS) == -1)
+    if (ix != DKIX_EMPTY && value != NULL)
+        if (_PyCode_CacheGlobal(code, globals, builtins,
+                               value, offset, GCACHE_BUILTINS) == -1)
             return NULL;
-    }
     return value;
 }
