@@ -207,10 +207,8 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
     co->co_extra = NULL;
-    if(PyTuple_GET_SIZE(names) == 0)
-        co->co_global_lookups = -1;
-    else
-        co->co_global_lookups = 0;
+    co->co_global_lookups = 0;
+    co->co_globals_cache = NULL;
     return co;
 }
 
@@ -450,6 +448,8 @@ code_dealloc(PyCodeObject *co)
         PyObject_GC_Del(co->co_zombieframe);
     if (co->co_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject*)co);
+    if (co->co_globals_cache != NULL)
+        PyMem_FREE(co->co_globals_cache);
     PyObject_DEL(co);
 }
 
@@ -922,41 +922,6 @@ typedef struct {
     PyObject *obj;
 } _Py_GlobalLookupCacheEntry;
 
-static Py_ssize_t _globalscache_index = -1;
-
-static inline int
-_PyCode_GetGlobalCache(PyCodeObject* code, _Py_GlobalLookupCacheEntry **cache) {
-    if(_globalscache_index < 0) {
-        _globalscache_index = _PyEval_RequestCodeExtraIndex((freefunc)
-                                                            PyMem_Free);
-    }
-    return _PyCode_GetExtra((PyObject*)code, _globalscache_index,
-                            (void**)cache);
-}
-
-static inline int
-_PyCode_SetGlobalCache(PyCodeObject* code, _Py_GlobalLookupCacheEntry* cache) {
-    if(_globalscache_index < 0) {
-        _globalscache_index = _PyEval_RequestCodeExtraIndex((freefunc)
-                                                            PyMem_Free);
-    }
-    int success = _PyCode_SetExtra((PyObject*)code,
-                                   _globalscache_index,
-                                   (void*)cache);
-    if(success == -1) {
-        PyInterpreterState *interp = PyThreadState_Get()->interp;
-        if(interp->co_extra_user_count == 0) {
-            /*
-             * This is triggered by a globals cache store at
-             * interpreter shutdown
-             */
-            PyErr_Clear();
-            return -2;
-        }
-    }
-    return success;
-}
-
 static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
                                       PyDictObject *builtins, PyObject* value,
                                       int offset,
@@ -965,8 +930,7 @@ static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
     if(UNDER_GLOBAL_LOOKUP_THRESHOLD(code))
         code->co_global_lookups++;
     else if(REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
-        if(_PyCode_GetGlobalCache(code, &globals_cache) < 0)
-            return -1;
+        globals_cache = code->co_globals_cache;
         if(globals_cache == NULL) {
             Py_ssize_t n_globals = PyTuple_GET_SIZE(code->co_names);
             globals_cache = (_Py_GlobalLookupCacheEntry*)\
@@ -974,14 +938,7 @@ static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
                                          sizeof(_Py_GlobalLookupCacheEntry));
             if(globals_cache == NULL)
                 return -1;
-            int success = _PyCode_SetGlobalCache(code, globals_cache);
-            if(success < 0) {
-                PyMem_Free(globals_cache);
-                /* Special case for interpreter shutdown */
-                if(success == -2)
-                    return 0;
-                return -1;
-            }
+            code->co_globals_cache = globals_cache;
         }
         globals_cache += offset;
         globals_cache->obj = value;
@@ -1018,8 +975,7 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
     uint16_t version_tag;
 
     if(SHOULD_USE_GLOBAL_CACHE(code) && REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
-        if(_PyCode_GetGlobalCache(code, &globals_cache) < 0)
-            return NULL;
+        globals_cache = code->co_globals_cache;
         if(globals_cache != NULL) {
             assert(offset >= 0 && offset < PyTuple_Size(code->co_names));
             globals_cache += offset;
@@ -1032,9 +988,8 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
                 version_tag = globals->ma_version_tag;
                 if(builtins->ma_version_tag > version_tag)
                     version_tag = builtins->ma_version_tag;
-                if(globals_cache->version_tag == version_tag) {
+                if(globals_cache->version_tag == version_tag)
                     return globals_cache->obj;
-                }
             }
             globals_cache->type = GCACHE_UNITIALIZED;
         }
