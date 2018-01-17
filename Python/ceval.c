@@ -33,6 +33,12 @@ extern int _PyObject_GetMethod(PyObject *, PyObject *, PyObject **);
 
 typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 
+/* Private API for the LOAD_GLOBAL opcode. */
+extern PyObject * _PyCode_LoadGlobalCached(PyCodeObject *code,
+                                           PyDictObject *globals,
+                                           PyDictObject *builtins,
+                                           int offset);
+
 /* Forward declarations */
 Py_LOCAL_INLINE(PyObject *) call_function(PyObject ***, Py_ssize_t,
                                           PyObject *);
@@ -526,7 +532,6 @@ PyEval_EvalCode(PyObject *co, PyObject *globals, PyObject *locals)
                       (PyObject **)NULL, 0,
                       NULL, NULL);
 }
-
 
 /* Interpreter main loop */
 
@@ -2147,20 +2152,20 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
         }
 
         TARGET(LOAD_GLOBAL) {
-            PyObject *name = GETITEM(names, oparg);
             PyObject *v;
             if (PyDict_CheckExact(f->f_globals)
                 && PyDict_CheckExact(f->f_builtins))
             {
-                v = _PyDict_LoadGlobal((PyDictObject *)f->f_globals,
-                                       (PyDictObject *)f->f_builtins,
-                                       name);
+                v = _PyCode_LoadGlobalCached(co,
+                                             (PyDictObject *)f->f_globals,
+                                             (PyDictObject *)f->f_builtins,
+                                             oparg);
                 if (v == NULL) {
                     if (!_PyErr_OCCURRED()) {
-                        /* _PyDict_LoadGlobal() returns NULL without raising
+                        /* _PyCode_LoadGlobalCached() returns NULL without raising
                          * an exception if the key doesn't exist */
                         format_exc_check_arg(PyExc_NameError,
-                                             NAME_ERROR_MSG, name);
+                                             NAME_ERROR_MSG, GETITEM(names, oparg));
                     }
                     goto error;
                 }
@@ -2168,6 +2173,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             }
             else {
                 /* Slow-path if globals or builtins is not a dict */
+                PyObject *name = GETITEM(names, oparg);
 
                 /* namespace 1: globals */
                 v = PyObject_GetItem(f->f_globals, name);

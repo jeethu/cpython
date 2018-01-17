@@ -44,6 +44,9 @@ typedef struct {
                                    Objects/lnotab_notes.txt for details. */
     void *co_zombieframe;       /* for optimization only (see frameobject.c) */
     PyObject *co_weakreflist;   /* to support weakrefs to code objects */
+
+    int co_global_lookups;      /* Number of global lookups */
+
     /* Scratch space for extra data relating to the code object.
        Type is a void* to keep the format private in codeobject.c to force
        people to go through the proper APIs. */
