@@ -34,10 +34,10 @@ extern int _PyObject_GetMethod(PyObject *, PyObject *, PyObject **);
 typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 
 /* Private API for the LOAD_GLOBAL opcode. */
-extern PyObject * _PyCode_LoadGlobalCached(PyCodeObject *code,
-                                           PyDictObject *globals,
-                                           PyDictObject *builtins,
-                                           int offset);
+extern PyObject * _PyCode_LoadGlobalCached(PyCodeObject *,
+                                           PyDictObject *,
+                                           PyDictObject *,
+                                           const int offset);
 
 /* Forward declarations */
 Py_LOCAL_INLINE(PyObject *) call_function(PyObject ***, Py_ssize_t,

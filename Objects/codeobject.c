@@ -901,56 +901,57 @@ _PyCode_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
  */
 
 /* Number of calls, after which to start caching global lookup */
-#define GLOBAL_CACHE_THRESHOLD 32
-#define SHOULD_USE_GLOBAL_CACHE(code) (code->co_global_lookups >= 0)
-#define UNDER_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups < \
-                                             GLOBAL_CACHE_THRESHOLD)
-#define REACHED_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups == \
-                                               GLOBAL_CACHE_THRESHOLD)
+#define GCACHE_OPT_THRESHOLD 128
+#define GCACHE_DEOPT_THRESHOLD 256
 
-typedef enum {
-    GCACHE_UNITIALIZED=0,
-    GCACHE_GLOBALS,
-    GCACHE_BUILTINS
-} _Py_GlobalLookupCacheEntryType;
+#define UNDER_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups < \
+                                             GCACHE_OPT_THRESHOLD)
+#define REACHED_GLOBAL_LOOKUP_THRESHOLD(code) (code->co_global_lookups == \
+                                               GCACHE_OPT_THRESHOLD)
+
+/* Macro to deoptimize the whole code object */
+#define DEOPT_CODE(x) x->co_global_lookups = -1
+
+#define IS_DEOPT(x) (x->co_global_lookups == -1)
+
+#define GCACHE_UNITIALIZED 0
+#define GCACHE_GLOBALS 1
+#define GCACHE_BUILTINS 2
+#define GCACHE_DEOPT 3
 
 /* Global lookup cache entry */
 
 typedef struct {
     uint64_t version_tag;
-    _Py_GlobalLookupCacheEntryType type;
     PyObject *obj;
+    uint32_t type;
+    uint32_t misses;
 } _Py_GlobalLookupCacheEntry;
 
 static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
                                       PyDictObject *builtins, PyObject* value,
                                       int offset,
-                                      _Py_GlobalLookupCacheEntryType tp) {
-    _Py_GlobalLookupCacheEntry *globals_cache = NULL;
-    if(UNDER_GLOBAL_LOOKUP_THRESHOLD(code))
-        code->co_global_lookups++;
-    else if(REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
-        globals_cache = code->co_globals_cache;
-        if(globals_cache == NULL) {
-            Py_ssize_t n_globals = PyTuple_GET_SIZE(code->co_names);
-            globals_cache = (_Py_GlobalLookupCacheEntry*)\
-                            PyMem_Calloc(n_globals,
-                                         sizeof(_Py_GlobalLookupCacheEntry));
-            if(globals_cache == NULL)
-                return -1;
-            code->co_globals_cache = globals_cache;
-        }
-        globals_cache += offset;
-        globals_cache->obj = value;
-        globals_cache->version_tag = globals->ma_version_tag;
-        if(tp == GCACHE_GLOBALS) {
-            globals_cache->type = GCACHE_GLOBALS;
-        }
-        else {
-            globals_cache->type = GCACHE_BUILTINS;
-            if(builtins->ma_version_tag > globals_cache->version_tag)
-                globals_cache->version_tag = builtins->ma_version_tag;
-        }
+                                      int type) {
+    _Py_GlobalLookupCacheEntry *globals_cache = code->co_globals_cache;
+    if(globals_cache == NULL) {
+        Py_ssize_t n_globals = PyTuple_GET_SIZE(code->co_names);
+        globals_cache = (_Py_GlobalLookupCacheEntry*)\
+                        PyMem_Calloc(n_globals,
+                                     sizeof(_Py_GlobalLookupCacheEntry));
+        if(globals_cache == NULL)
+            return -1;
+        code->co_globals_cache = globals_cache;
+    }
+    globals_cache += offset;
+    globals_cache->obj = value;
+    globals_cache->version_tag = globals->ma_version_tag;
+    if(type == GCACHE_GLOBALS) {
+        globals_cache->type = GCACHE_GLOBALS;
+    }
+    else {
+        globals_cache->type = GCACHE_BUILTINS;
+        if(builtins->ma_version_tag > globals_cache->version_tag)
+            globals_cache->version_tag = builtins->ma_version_tag;
     }
     return 0;
 }
@@ -958,42 +959,59 @@ static inline int _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
 /* Fast version of global value lookup (LOAD_GLOBAL).
  * Lookup in globals, then builtins and cache the
  * lookup result in code->co_extra if the number of lookups exceeds
- * GLOBAL_CACHE_THRESHOLD
+ * GCACHE_OPT_THRESHOLD
  *
  * Raise an exception and return NULL if an error occurred (ex: computing the
  * key hash failed, key comparison failed, ...). Return NULL if the key doesn't
  * exist. Return the value if the key exists.
  */
-PyObject* _Py_HOT_FUNCTION
+PyObject*
 _PyCode_LoadGlobalCached(PyCodeObject *code,
                          PyDictObject *globals, PyDictObject *builtins,
                          int offset) {
     Py_ssize_t ix;
     Py_hash_t hash;
     PyObject *key, *value;
-    _Py_GlobalLookupCacheEntry *globals_cache;
-    uint16_t version_tag;
+    _Py_GlobalLookupCacheEntry *cache;
+    uint64_t version_tag;
 
-    if(SHOULD_USE_GLOBAL_CACHE(code) && REACHED_GLOBAL_LOOKUP_THRESHOLD(code)) {
-        globals_cache = code->co_globals_cache;
-        if(globals_cache != NULL) {
-            assert(offset >= 0 && offset < PyTuple_Size(code->co_names));
-            globals_cache += offset;
-            if(globals_cache->type == GCACHE_GLOBALS) {
-                if(globals_cache->version_tag == globals->ma_version_tag) {
-                    return globals_cache->obj;
-                }
+    if(code->co_global_lookups < GCACHE_OPT_THRESHOLD) {
+        key = PyTuple_GET_ITEM(code->co_names, offset);
+        if(!IS_DEOPT(code)) {
+            code->co_global_lookups++;
+        }
+        return _PyDict_LoadGlobal(globals, builtins, key);
+    }
+
+    cache = code->co_globals_cache;
+    if(cache != NULL) {
+        assert(offset >= 0 && offset < PyTuple_Size(code->co_names));
+        cache += offset;
+        if(cache->type == GCACHE_GLOBALS) {
+            if(cache->version_tag == globals->ma_version_tag) {
+                return cache->obj;
             }
-            else if(globals_cache->type == GCACHE_BUILTINS) {
-                version_tag = globals->ma_version_tag;
-                if(builtins->ma_version_tag > version_tag)
-                    version_tag = builtins->ma_version_tag;
-                if(globals_cache->version_tag == version_tag)
-                    return globals_cache->obj;
-            }
-            globals_cache->type = GCACHE_UNITIALIZED;
+        }
+        else if(cache->type == GCACHE_BUILTINS) {
+            version_tag = globals->ma_version_tag;
+            if(builtins->ma_version_tag > version_tag)
+                version_tag = builtins->ma_version_tag;
+            if(cache->version_tag == version_tag)
+                return cache->obj;
+        }
+        cache->type = GCACHE_UNITIALIZED;
+        if(++(cache->misses) == GCACHE_DEOPT_THRESHOLD) {
+            DEOPT_CODE(code);
+            key = PyTuple_GET_ITEM(code->co_names, offset);
+            return _PyDict_LoadGlobal(globals, builtins, key);
         }
     }
+
+    /*
+     * This part almost mirrors _PyDict_LoadGlobal
+     * but in this case if the lookup succeeds, we need to
+     * know which dictionary it was found in.
+     */
 
     key = PyTuple_GET_ITEM(code->co_names, offset);
     if (!PyUnicode_CheckExact(key) ||
@@ -1009,9 +1027,8 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
     if (ix == DKIX_ERROR)
         return NULL;
     if (ix != DKIX_EMPTY && value != NULL) {
-        if(SHOULD_USE_GLOBAL_CACHE(code) && _PyCode_CacheGlobal(code, globals, builtins,
-                                                                value, offset,
-                                                                GCACHE_GLOBALS) == -1)
+        if(_PyCode_CacheGlobal(code, globals, builtins, value, offset,
+                               GCACHE_GLOBALS) == -1)
             return NULL;
         return value;
     }
@@ -1022,9 +1039,8 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
         return NULL;
 
     if(ix != DKIX_EMPTY && value != NULL) {
-        if(SHOULD_USE_GLOBAL_CACHE(code) && _PyCode_CacheGlobal(code, globals, builtins,
-                                                                value, offset,
-                                                                GCACHE_BUILTINS) == -1)
+        if(_PyCode_CacheGlobal(code, globals, builtins, value, offset,
+                               GCACHE_BUILTINS) == -1)
             return NULL;
     }
     return value;
