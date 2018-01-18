@@ -206,7 +206,7 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
     co->co_extra = NULL;
-    co->co_op_cache_counters = (PyCode_OpCache_Counters){0, 0, 0, 0, 0, 0};
+    co->co_op_cache_counters = (PyCode_OpCache_Counters){0, 0, 0};
     co->co_op_cache = NULL;
     return co;
 }

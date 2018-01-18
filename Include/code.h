@@ -19,12 +19,9 @@ typedef uint16_t _Py_CODEUNIT;
 
 /* Opcode cache packed counters */
 typedef struct {
-    unsigned int global_lookups: 16;
-    unsigned int attr_lookups: 16;
-    unsigned int method_lookups: 16;
-    unsigned int global_lookups_disabled: 1;
-    unsigned int attr_lookups_disabled: 1;
-    unsigned int method_lookups_disabled: 1;
+    int global_lookups: 16;
+    int attr_lookups: 16;
+    int method_lookups: 16;
 } PyCode_OpCache_Counters;
 
 /* Bytecode object */
