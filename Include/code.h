@@ -17,6 +17,16 @@ typedef uint16_t _Py_CODEUNIT;
 #  define _Py_OPARG(word) ((word) >> 8)
 #endif
 
+/* Opcode cache packed counters */
+typedef struct {
+    unsigned int global_lookups: 16;
+    unsigned int attr_lookups: 16;
+    unsigned int method_lookups: 16;
+    unsigned int global_lookups_disabled: 1;
+    unsigned int attr_lookups_disabled: 1;
+    unsigned int method_lookups_disabled: 1;
+} PyCode_OpCache_Counters;
+
 /* Bytecode object */
 typedef struct {
     PyObject_HEAD
@@ -50,8 +60,8 @@ typedef struct {
        people to go through the proper APIs. */
     void *co_extra;
 
-    int co_global_lookups;      /* Number of global lookups */
-    void *co_globals_cache;     /* Structure to hold cached values */
+    PyCode_OpCache_Counters co_op_cache_counters;
+    void *co_op_cache;     /* Structure to hold cached values */
 
 } PyCodeObject;
 

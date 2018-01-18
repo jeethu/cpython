@@ -37,7 +37,7 @@ typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 extern PyObject * _PyCode_LoadGlobalCached(PyCodeObject *,
                                            PyDictObject *,
                                            PyDictObject *,
-                                           const int offset);
+                                           const int, const int);
 
 /* Forward declarations */
 Py_LOCAL_INLINE(PyObject *) call_function(PyObject ***, Py_ssize_t,
@@ -708,6 +708,11 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
     } while (0)
 #define JUMPTO(x)       (next_instr = first_instr + (x) / sizeof(_Py_CODEUNIT))
 #define JUMPBY(x)       (next_instr += (x) / sizeof(_Py_CODEUNIT))
+
+
+/* Opcode cache macros */
+
+#define OP_CACHE_INDEX() ((int)(next_instr - first_instr) - 1)
 
 /* OpCode prediction macros
     Some opcodes tend to come in pairs thus making it possible to
@@ -2105,7 +2110,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
                 v = _PyCode_LoadGlobalCached(co,
                                              (PyDictObject *)f->f_globals,
                                              (PyDictObject *)f->f_builtins,
-                                             oparg);
+                                             oparg, OP_CACHE_INDEX());
                 if (v == NULL) {
                     if (!_PyErr_OCCURRED()) {
                         /* _PyCode_LoadGlobalCached() returns NULL without raising
