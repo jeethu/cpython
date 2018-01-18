@@ -37,7 +37,11 @@ typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 extern PyObject * _PyCode_LoadGlobalCached(PyCodeObject *,
                                            PyDictObject *,
                                            PyDictObject *,
-                                           const int, const int);
+                                           const int, const unsigned int);
+
+/* Private API for the LOAD_ATTR opcode */
+extern PyObject * _PyCode_CachedGetAttr(PyCodeObject *, PyObject *,
+                                        const int, const int);
 
 /* Forward declarations */
 Py_LOCAL_INLINE(PyObject *) call_function(PyObject ***, Py_ssize_t,
@@ -712,7 +716,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 
 /* Opcode cache macros */
 
-#define OP_CACHE_INDEX() ((int)(next_instr - first_instr) - 1)
+#define OP_CACHE_INDEX() ((unsigned int)((next_instr - first_instr) - 1))
 
 /* OpCode prediction macros
     Some opcodes tend to come in pairs thus making it possible to

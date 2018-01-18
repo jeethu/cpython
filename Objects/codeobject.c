@@ -918,17 +918,56 @@ _PyCode_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
 
 #define MCACHE_IS_DEOPT(x) (x->co_op_cache_counters.attr_lookups_disabled)
 
-/* Macro to deoptimize global lookups for the whole code object */
+/* Macro to deoptimize global lookup caching for the whole code object */
 
 #define GCACHE_DEOPT_CODE(x)                                 \
     do {                                                     \
-        x->co_op_cache_counters.global_lookups_disabled = 1;  \
+        x->co_op_cache_counters.global_lookups_disabled = 1; \
         if (ACACHE_IS_DEOPT(x) &&                            \
             MCACHE_IS_DEOPT(x) &&                            \
             x->co_op_cache != NULL) {                        \
             PyMem_FREE(x->co_op_cache);                      \
             x->co_op_cache = NULL;                           \
         }                                                    \
+    } while(0)
+
+/* Macro to deoptimize attribute lookup caching for the whole code object */
+
+#define ACACHE_DEOPT_CODE(x)                                 \
+    do {                                                     \
+        x->co_op_cache_counters.attr_lookups_disabled = 1;   \
+        if (GCACHE_IS_DEOPT(x) &&                            \
+            MCACHE_IS_DEOPT(x) &&                            \
+            x->co_op_cache != NULL) {                        \
+            PyMem_FREE(x->co_op_cache);                      \
+            x->co_op_cache = NULL;                           \
+        }                                                    \
+    } while(0)
+
+/* Macro to deoptimize method lookup caching for the whole code object */
+
+#define MCACHE_DEOPT_CODE(x)                                  \
+    do {                                                      \
+        x->co_op_cache_counters.method_lookups_disabled = 1;  \
+        if (GCACHE_IS_DEOPT(x) &&                             \
+            ACACHE_IS_DEOPT(x) &&                             \
+            x->co_op_cache != NULL) {                         \
+            PyMem_FREE(x->co_op_cache);                       \
+            x->co_op_cache = NULL;                            \
+        }                                                     \
+    } while(0)
+
+/* Macro to deoptimize all lookup caching for the whole code object */
+
+#define CACHE_DEOPT_CODE_ALL(x)                               \
+    do {                                                      \
+        x->co_op_cache_counters.global_lookups_disabled = 1;  \
+        x->co_op_cache_counters.attr_lookups_disabled   = 1;  \
+        x->co_op_cache_counters.method_lookups_disabled = 1;  \
+        if ( x->co_op_cache != NULL) {                        \
+            PyMem_FREE(x->co_op_cache);                       \
+            x->co_op_cache = NULL;                            \
+        }                                                     \
     } while(0)
 
 #define CACHE_UNITIALIZED 0
@@ -946,15 +985,42 @@ typedef struct {
     uint16_t misses;
 } _Py_GlobalLookupCacheEntry;
 
-static inline _Py_GlobalLookupCacheEntry *
-_PyCode_AllocateCache(PyCodeObject *code)
+static inline int
+_PyCode_AllocateCache(PyCodeObject *code, _Py_GlobalLookupCacheEntry **ptr)
 {
     Py_ssize_t code_len = PyBytes_GET_SIZE(code->co_code);
     Py_ssize_t n_opcodes =  code_len / sizeof(_Py_CODEUNIT);
-    return (_Py_GlobalLookupCacheEntry *)
-            PyMem_Calloc(n_opcodes,
-                         sizeof(_Py_GlobalLookupCacheEntry));
+
+    if(n_opcodes >= UINT16_MAX)
+        return -2;      // Cannot optimize code objects with 2**16 or more ops
+    *ptr = (_Py_GlobalLookupCacheEntry *)
+            PyMem_Calloc(n_opcodes, sizeof(_Py_GlobalLookupCacheEntry));
+    if(*ptr == NULL)
+        return -1;
+    return 0;
 }
+
+PyObject *
+_PyCode_CachedGetAttr(PyCodeObject *code, PyObject *v,
+                      const int name_offset, const int opcode_offset)
+{
+    PyObject *name;
+    PyTypeObject *tp = Py_TYPE(v);
+    if (tp->tp_getattro != PyObject_GenericGetAttr) {
+        name = PyTuple_GET_ITEM(code->co_names, name_offset);
+        return PyObject_GetAttr(v, name);
+    }
+
+    if(ACACHE_IS_DEOPT(code)) {
+        name = PyTuple_GET_ITEM(code->co_names, name_offset);
+        return PyObject_GetAttr(v, name);
+    }
+
+    // FIXME: This is incomplete
+    name = PyTuple_GET_ITEM(code->co_names, name_offset);
+    return PyObject_GetAttr(v, name);
+}
+
 
 static inline int
 _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
@@ -963,9 +1029,13 @@ _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
 {
     _Py_GlobalLookupCacheEntry *cache = code->co_op_cache;
     if(cache == NULL) {
-        cache = _PyCode_AllocateCache(code);
-        if(cache == NULL)
-            return -1;
+        int success = _PyCode_AllocateCache(code, &cache);
+        if(success == -1)
+            return success;
+        else if(success == -2) {
+            CACHE_DEOPT_CODE_ALL(code);
+            return 0;
+        }
         code->co_op_cache = cache;
     }
     cache += opcode_offset;
@@ -994,7 +1064,7 @@ _PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
 PyObject *
 _PyCode_LoadGlobalCached(PyCodeObject *code,
                          PyDictObject *globals, PyDictObject *builtins,
-                         const int name_offset, const int opcode_offset) {
+                         const int name_offset, const unsigned int opcode_offset) {
     Py_ssize_t ix;
     Py_hash_t hash;
     PyObject *key, *value;
