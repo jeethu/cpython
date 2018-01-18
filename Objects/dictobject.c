@@ -1398,7 +1398,8 @@ _PyDict_GetItemIdWithError(PyObject *dp, struct _Py_Identifier *key)
  * exist. Return the value if the key exists.
  */
 PyObject *
-_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
+_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key,
+                   int * where)
 {
     Py_ssize_t ix;
     Py_hash_t hash;
@@ -1416,13 +1417,18 @@ _PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
     ix = globals->ma_keys->dk_lookup(globals, key, hash, &value);
     if (ix == DKIX_ERROR)
         return NULL;
-    if (ix != DKIX_EMPTY && value != NULL)
+    if (ix != DKIX_EMPTY && value != NULL) {
+        if (where != NULL)
+            *where = 1;
         return value;
+    }
 
     /* namespace 2: builtins */
     ix = builtins->ma_keys->dk_lookup(builtins, key, hash, &value);
     if (ix < 0)
         return NULL;
+    if (where != NULL)
+        *where = 2;
     return value;
 }
 
