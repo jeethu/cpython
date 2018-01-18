@@ -985,18 +985,97 @@ typedef struct {
     uint16_t misses;
 } _Py_GlobalLookupCacheEntry;
 
+typedef struct {
+    Py_ssize_t index_size;  /* In bytes */
+    uint16_t index[];
+} _PyGlobalLookupCacheIndex;
+
+// FIXME: This is a bad idea
+#include "opcode.h"
+
 static inline int
-_PyCode_AllocateCache(PyCodeObject *code, _Py_GlobalLookupCacheEntry **ptr)
+_PyCode_AllocateCache(PyCodeObject *code, _PyGlobalLookupCacheIndex **ptr)
 {
+    Py_ssize_t cacheable_ops = 0, to_allocate;
     Py_ssize_t code_len = PyBytes_GET_SIZE(code->co_code);
     Py_ssize_t n_opcodes =  code_len / sizeof(_Py_CODEUNIT);
+    _PyGlobalLookupCacheIndex *mem;
+    _Py_CODEUNIT *first_instr, *instr;
 
-    if(n_opcodes >= UINT16_MAX)
-        return -2;      // Cannot optimize code objects with 2**16 or more ops
-    *ptr = (_Py_GlobalLookupCacheEntry *)
-            PyMem_Calloc(n_opcodes, sizeof(_Py_GlobalLookupCacheEntry));
-    if(*ptr == NULL)
+    if(n_opcodes == 0 || n_opcodes >= UINT16_MAX) {
+        // Cannot optimize code objects with no op codes or >= 2**16 ops
+        return -2;
+    }
+
+    first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(code->co_code);
+    instr = first_instr;
+    for(int i=0; i < n_opcodes; i++, instr++) {
+        int opcode = _Py_OPCODE(*instr);
+        if(opcode == LOAD_GLOBAL || opcode == LOAD_ATTR || opcode == LOAD_METHOD)
+            cacheable_ops += 1;
+    }
+    to_allocate = sizeof(_Py_GlobalLookupCacheEntry) + code_len +
+                  (sizeof(_Py_GlobalLookupCacheEntry) * cacheable_ops);
+
+    mem = (_PyGlobalLookupCacheIndex *)
+           PyMem_Calloc(1, to_allocate);
+    if(mem == NULL) {
         return -1;
+    }
+    instr = first_instr;
+    for(int i=0, j=1; i < n_opcodes; i++, instr++) {
+        int opcode = _Py_OPCODE(*instr);
+        if(opcode == LOAD_GLOBAL || opcode == LOAD_ATTR || opcode == LOAD_METHOD)
+            mem->index[i] = j++;
+    }
+    mem->index_size = code_len;
+    *ptr = mem;
+    return 0;
+}
+
+static inline _Py_GlobalLookupCacheEntry *
+_PyCode_LookupCacheIndex(const _PyGlobalLookupCacheIndex *cache_index_table,
+                         const int opcode_offset)
+{
+    uint16_t cache_offset = cache_index_table->index[opcode_offset];
+    if(cache_offset == 0) /* This means the this op has been de-optimized */
+        return NULL;
+    _Py_GlobalLookupCacheEntry * base =
+        (_Py_GlobalLookupCacheEntry *)
+            (((void *)cache_index_table) + sizeof(Py_ssize_t)
+                      + cache_index_table->index_size);
+    _Py_GlobalLookupCacheEntry * ptr = base + (cache_offset - 1);
+    return ptr;
+}
+
+static inline int
+_PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
+                    PyDictObject *builtins, PyObject* value,
+                    int opcode_offset, int type)
+{
+    _PyGlobalLookupCacheIndex *cache_index_table = code->co_op_cache;
+    if(cache_index_table == NULL) {
+        int success = _PyCode_AllocateCache(code, &cache_index_table);
+        if(success == -1)
+            return success;
+        else if(success == -2) {
+            CACHE_DEOPT_CODE_ALL(code);
+            return 0;
+        }
+        code->co_op_cache = cache_index_table;
+    }
+    _Py_GlobalLookupCacheEntry *cache = _PyCode_LookupCacheIndex(cache_index_table,
+                                                                 opcode_offset);
+    cache->obj = value;
+    cache->version_tag = globals->ma_version_tag;
+    if(type == CACHE_GLOBALS) {
+        cache->type = CACHE_GLOBALS;
+    }
+    else {
+        cache->type = CACHE_BUILTINS;
+        if(builtins->ma_version_tag > cache->version_tag)
+            cache->version_tag = builtins->ma_version_tag;
+    }
     return 0;
 }
 
@@ -1022,36 +1101,6 @@ _PyCode_CachedGetAttr(PyCodeObject *code, PyObject *v,
 }
 
 
-static inline int
-_PyCode_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
-                    PyDictObject *builtins, PyObject* value,
-                    int opcode_offset, int type)
-{
-    _Py_GlobalLookupCacheEntry *cache = code->co_op_cache;
-    if(cache == NULL) {
-        int success = _PyCode_AllocateCache(code, &cache);
-        if(success == -1)
-            return success;
-        else if(success == -2) {
-            CACHE_DEOPT_CODE_ALL(code);
-            return 0;
-        }
-        code->co_op_cache = cache;
-    }
-    cache += opcode_offset;
-    cache->obj = value;
-    cache->version_tag = globals->ma_version_tag;
-    if(type == CACHE_GLOBALS) {
-        cache->type = CACHE_GLOBALS;
-    }
-    else {
-        cache->type = CACHE_BUILTINS;
-        if(builtins->ma_version_tag > cache->version_tag)
-            cache->version_tag = builtins->ma_version_tag;
-    }
-    return 0;
-}
-
 /* Fast version of global value lookup (LOAD_GLOBAL).
  * Lookup in globals, then builtins and cache the
  * lookup result in code->co_extra if the number of lookups exceeds
@@ -1068,10 +1117,12 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
     Py_ssize_t ix;
     Py_hash_t hash;
     PyObject *key, *value;
+    _PyGlobalLookupCacheIndex *cache_index_table;
     _Py_GlobalLookupCacheEntry *cache;
     uint64_t version_tag;
 
-    if(code->co_op_cache_counters.global_lookups < GCACHE_OPT_THRESHOLD) {
+    if(GCACHE_IS_DEOPT(code) ||
+       code->co_op_cache_counters.global_lookups < GCACHE_OPT_THRESHOLD) {
         key = PyTuple_GET_ITEM(code->co_names, name_offset);
         if(!GCACHE_IS_DEOPT(code)) {
             code->co_op_cache_counters.global_lookups++;
@@ -1079,29 +1130,28 @@ _PyCode_LoadGlobalCached(PyCodeObject *code,
         return _PyDict_LoadGlobal(globals, builtins, key);
     }
 
-    cache = code->co_op_cache;
-    if(cache != NULL) {
-        assert(opcode_offset >= 0 &&
-               opcode_offset < (PyBytes_Size(code->co_code)
-                                / sizeof(_Py_CODEUNIT)));
-        cache += opcode_offset;
-        if(cache->type == CACHE_GLOBALS) {
-            if(cache->version_tag == globals->ma_version_tag) {
-                return cache->obj;
+    cache_index_table = code->co_op_cache;
+    if(cache_index_table != NULL) {
+        cache = _PyCode_LookupCacheIndex(cache_index_table, opcode_offset);
+        if(cache != NULL) {
+            if(cache->type == CACHE_GLOBALS) {
+                if(cache->version_tag == globals->ma_version_tag) {
+                    return cache->obj;
+                }
             }
-        }
-        else if(cache->type == CACHE_BUILTINS) {
-            version_tag = globals->ma_version_tag;
-            if(builtins->ma_version_tag > version_tag)
-                version_tag = builtins->ma_version_tag;
-            if(cache->version_tag == version_tag)
-                return cache->obj;
-        }
-        cache->type = CACHE_UNITIALIZED;
-        if(++(cache->misses) == GCACHE_DEOPT_THRESHOLD) {
-            GCACHE_DEOPT_CODE(code);
-            key = PyTuple_GET_ITEM(code->co_names, name_offset);
-            return _PyDict_LoadGlobal(globals, builtins, key);
+            else if(cache->type == CACHE_BUILTINS) {
+                version_tag = globals->ma_version_tag;
+                if(builtins->ma_version_tag > version_tag)
+                    version_tag = builtins->ma_version_tag;
+                if(cache->version_tag == version_tag)
+                    return cache->obj;
+            }
+            cache->type = CACHE_UNITIALIZED;
+            if(++(cache->misses) == GCACHE_DEOPT_THRESHOLD) {
+                GCACHE_DEOPT_CODE(code);
+                key = PyTuple_GET_ITEM(code->co_names, name_offset);
+                return _PyDict_LoadGlobal(globals, builtins, key);
+            }
         }
     }
 
