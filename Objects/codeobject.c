@@ -910,7 +910,14 @@ _PyCode_SetExtra(PyObject *code, Py_ssize_t index, void *extra)
                                                GCACHE_OPT_THRESHOLD)
 
 /* Macro to deoptimize the whole code object */
-#define DEOPT_CODE(x) x->co_global_lookups = -1
+#define DEOPT_CODE(x)                         \
+    do {                                      \
+        x->co_global_lookups = -1;            \
+        if (x->co_globals_cache != NULL) {    \
+            PyMem_FREE(x->co_globals_cache);  \
+            x->co_globals_cache = NULL;       \
+        }                                     \
+    } while(0)
 
 #define IS_DEOPT(x) (x->co_global_lookups == -1)
 
