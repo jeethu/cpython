@@ -93,7 +93,7 @@ intern_string_constants(PyObject *tuple)
 }
 
 /* Private API */
-Py_ssize_t _PyEval_CodeCacheSize(const PyCodeObject *);
+Py_ssize_t _PyEval_InlineCacheSize(const PyCodeObject *);
 
 PyCodeObject *
 PyCode_New(int argcount, int kwonlyargcount,
@@ -467,7 +467,7 @@ code_sizeof(PyCodeObject *co, void *unused)
         res += sizeof(_PyCodeObjectExtra) +
                (co_extra->ce_size-1) * sizeof(co_extra->ce_extras[0]);
     }
-    res += _PyEval_CodeCacheSize(co);
+    res += _PyEval_InlineCacheSize(co);
     return PyLong_FromSsize_t(res);
 }
 
