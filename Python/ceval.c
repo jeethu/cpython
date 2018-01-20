@@ -2582,10 +2582,9 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             PyObject *res;
 
             if(PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG) &&
-               type->tp_getattro == PyObject_GenericGetAttr &&
-               type->tp_dictoffset > 0)
+               type->tp_getattro == PyObject_GenericGetAttr)
             {
-                if (type->tp_dict == NULL) {
+                if (type->tp_dictoffset > 0 && type->tp_dict == NULL) {
                     if (PyType_Ready(type) < 0) {
                         Py_DECREF(owner);
                         SET_TOP(NULL);
@@ -5166,22 +5165,22 @@ maybe_dtrace_line(PyFrameObject *frame,
  */
 
 /* Number of calls, after which to start caching a global variable lookup */
-#define GCACHE_OPT_THRESHOLD 256
+#define GCACHE_OPT_THRESHOLD 128
 
 /* Number of misses, after which to stop caching global variable lookup */
 #define GCACHE_DEOPT_THRESHOLD (GCACHE_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching an attribute lookup */
-#define ACACHE_OPT_THRESHOLD 256
+#define ACACHE_OPT_THRESHOLD 128
 
 /* Number of misses, after which to stop caching an attribute lookup */
-#define ACACHE_DEOPT_THRESHOLD (ACACHE_OPT_THRESHOLD / 4)
+#define ACACHE_DEOPT_THRESHOLD (ACACHE_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching a method lookup */
-#define MCACHE_OPT_THRESHOLD 256
+#define MCACHE_OPT_THRESHOLD 128
 
 /* Number of misses, after which to stop caching a method lookup */
-#define MCACHE_DEOPT_THRESHOLD MCACHE_OPT_THRESHOLD
+#define MCACHE_DEOPT_THRESHOLD (MCACHE_OPT_THRESHOLD / 2)
 
 #define GCACHE_IS_DEOPT(x) (x->co_op_cache_counters.global_lookups == -1)
 
@@ -5506,109 +5505,14 @@ _PyEval_InlineCacheAttributeDescr(PyCodeObject *code, PyTypeObject *type,
     return 0;
 }
 
-static PyObject *
-_PyEval_InlineCachedGetAttr(PyCodeObject *code, PyTypeObject *type,
-                            PyObject *owner, PyObject* name,
-                            const int opcode_offset)
-{
-    PyObject *attr, *descr;
-    descrgetfunc descr_get;
-    PyDictObject *dict, **dictptr;
-    _PyEval_CacheIndex *cache_index;
-    _PyEval_CacheEntry *cache;
-
-    if(ACACHE_IS_DEOPT(code) ||
-       code->co_op_cache_counters.attr_lookups < ACACHE_OPT_THRESHOLD)
-    {
-        if(!ACACHE_IS_DEOPT(code))
-            code->co_op_cache_counters.attr_lookups++;
-        goto load_attr_cached_fallback;
-    }
-
-    cache_index = code->co_op_cache;
-    if(cache_index != NULL) {
-        cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
-        if(cache == NULL) {
-            /* This op has been de-optimized */
-            goto load_attr_cached_fallback;
-        }
-        if(cache->data.attr.tp_version_tag == type->tp_version_tag) {
-            if (cache->type == CACHE_ATTRIBUTE_DICT) {
-                dictptr = (PyDictObject **) 
-                          ((char *)owner + type->tp_dictoffset);
-                dict = *dictptr;
-                if (dict != NULL) {
-                    if(cache->data.attr.ma_version_tag ==
-                       dict->ma_version_tag)
-                    {
-                        attr = cache->data.attr.attr;
-                        Py_INCREF(attr);
-                        return attr;
-                    }
-                }
-            }
-            else if (cache->type == CACHE_ATTRIBUTE_DESCR) {
-                descr = cache->data.attr.attr;
-                descr_get = descr->ob_type->tp_descr_get;
-                if(descr_get != NULL) {
-                    return descr_get(descr, owner, (PyObject *)type);
-                }
-            }
-        }
-        /* Cache miss */
-        if (!_PyEval_InlineCacheMiss(code, cache_index, cache,
-                                     opcode_offset, CACHE_ATTRIBUTE_DICT))
-            goto load_attr_cached_fallback;
-    }
-
-    descr = _PyType_Lookup(type, name);
-    if (descr != NULL && 
-        descr->ob_type->tp_descr_get != NULL && PyDescr_IsData(descr))
-    {
-        if(_PyEval_InlineCacheAttributeDescr(code, type,
-                                             descr, opcode_offset) == -1)
-            return NULL;
-        descr_get = descr->ob_type->tp_descr_get;
-        return descr_get(descr, owner, (PyObject *)type);
-    }
-    else if (descr == NULL || descr->ob_type->tp_descr_get == NULL ||
-             !PyDescr_IsData(descr))
-    {
-        dictptr = (PyDictObject **) ((char *)owner + type->tp_dictoffset);
-        dict = *dictptr;
-        if (dict != NULL && PyDict_CheckExact(dict)) {
-            attr = PyDict_GetItem((PyObject *)dict, name);
-            if(attr != NULL) {
-                if(_PyEval_InlineCacheAttribute(code, type, dict,
-                                                attr, opcode_offset) == -1)
-                    return NULL;
-                Py_INCREF(attr);
-                return attr;
-            }
-        }
-    }
-    /* Dynamic value, deopt immediately */
-    if(cache_index != NULL) {
-        cache_index->index[opcode_offset] = 0;
-        if (++cache_index->attribute_deopts
-            == cache_index->attribute_lookup_sites)
-        {
-            ACACHE_DEOPT_CODE(code);
-        }
-    }
-load_attr_cached_fallback:
-    return PyObject_GetAttr(owner, name);
-}
-
-
-/* Fast version of global value lookup (LOAD_GLOBAL).
+/* A caching version of global value lookup (LOAD_GLOBAL).
  * Lookup in globals, then builtins and cache the
  * lookup result in code->co_extra if the number of lookups exceeds
  * GCACHE_OPT_THRESHOLD
  *
- * Raise an exception and return NULL if an error occurred (ex: computing the
- * key hash failed, key comparison failed, ...). Return NULL if the key doesn't
- * exist. Return the value if the key exists.
+ * Falls back on _PyDict_LoadGlobal and has exactly the same semantics as that
+ * function (Raise an exception and return NULL if an error occurred,
+ * return NULL if the key doesn't exist and Return the value if the key exists.)
  */
 static PyObject *
 _PyEval_InlineCachedLoadGlobal(PyCodeObject *code,
@@ -5662,4 +5566,106 @@ load_global_cached_fallback:
             return NULL;
     }
     return value;
+}
+
+/* A caching version of attribute lookup (LOAD_ATTR).
+ * Falls back on PyObject_GetAttr
+ */
+static PyObject *
+_PyEval_InlineCachedGetAttr(PyCodeObject *code, PyTypeObject *type,
+                            PyObject *owner, PyObject* name,
+                            const int opcode_offset)
+{
+    PyObject *attr, *descr, **dictptr;
+    descrgetfunc descr_get;
+    PyDictObject *dict;
+    _PyEval_CacheIndex *cache_index;
+    _PyEval_CacheEntry *cache;
+
+    if(ACACHE_IS_DEOPT(code) ||
+       code->co_op_cache_counters.attr_lookups < ACACHE_OPT_THRESHOLD)
+    {
+        if(!ACACHE_IS_DEOPT(code))
+            code->co_op_cache_counters.attr_lookups++;
+        goto load_attr_cached_fallback;
+    }
+
+    cache_index = code->co_op_cache;
+    if(cache_index != NULL) {
+        cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
+        if(cache == NULL) {
+            /* This op has been de-optimized */
+            goto load_attr_cached_fallback;
+        }
+        if(cache->data.attr.tp_version_tag == type->tp_version_tag) {
+            if (cache->type == CACHE_ATTRIBUTE_DICT) {
+                dictptr = _PyObject_GetDictPtr(owner);
+                if(dictptr) {
+                    dict = (PyDictObject *)*dictptr;
+                    if (dict != NULL && PyDict_CheckExact(dict)) {
+                        if(cache->data.attr.ma_version_tag ==
+                           dict->ma_version_tag)
+                        {
+                            attr = cache->data.attr.attr;
+                            Py_INCREF(attr);
+                            return attr;
+                        }
+                    }
+                }
+            }
+            else if (cache->type == CACHE_ATTRIBUTE_DESCR) {
+                descr = cache->data.attr.attr;
+                descr_get = descr->ob_type->tp_descr_get;
+                if(descr_get != NULL) {
+                    return descr_get(descr, owner, (PyObject *)type);
+                }
+            }
+        }
+        /* Cache miss */
+        if (!_PyEval_InlineCacheMiss(code, cache_index, cache,
+                                     opcode_offset, CACHE_ATTRIBUTE_DICT))
+            goto load_attr_cached_fallback;
+    }
+
+    descr = _PyType_Lookup(type, name);
+    if (descr != NULL && 
+        descr->ob_type->tp_descr_get != NULL && PyDescr_IsData(descr))
+    {
+        if(_PyEval_InlineCacheAttributeDescr(code, type,
+                                             descr, opcode_offset) == -1)
+            return NULL;
+        descr_get = descr->ob_type->tp_descr_get;
+        return descr_get(descr, owner, (PyObject *)type);
+    }
+    else if (descr == NULL || descr->ob_type->tp_descr_get == NULL ||
+             !PyDescr_IsData(descr))
+    {
+        dictptr = _PyObject_GetDictPtr(owner);
+        if(dictptr) {
+            dict = (PyDictObject *)*dictptr;
+            if (dict != NULL && PyDict_CheckExact(dict)) {
+                Py_INCREF(dict);
+                attr = PyDict_GetItem((PyObject *)dict, name);
+                Py_DECREF(dict);
+                if(attr != NULL) {
+                    if(_PyEval_InlineCacheAttribute(code, type, dict,
+                                                    attr, opcode_offset) == -1)
+                        return NULL;
+                    Py_INCREF(attr);
+                    return attr;
+                }
+            }
+        }
+    }
+    /* Dynamic value, deopt immediately */
+    if(cache_index != NULL) {
+        cache_index->index[opcode_offset] = 0;
+        if (++cache_index->attribute_deopts
+            == cache_index->attribute_lookup_sites)
+        {
+            ACACHE_DEOPT_CODE(code);
+        }
+    }
+load_attr_cached_fallback:
+    return PyObject_GetAttr(owner, name);
 }
