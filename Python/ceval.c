@@ -34,16 +34,17 @@ extern int _PyObject_GetMethod(PyObject *, PyObject *, PyObject **);
 typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 
 /* Private API for the LOAD_GLOBAL opcode. */
-Py_LOCAL_INLINE(PyObject *) _PyEval_InlineCachedLoadGlobal(PyCodeObject *,
-                                                           PyDictObject *,
-                                                           PyDictObject *,
-                                                           const int,
-                                                           const unsigned int);
+static PyObject * _PyEval_InlineCachedLoadGlobal(PyCodeObject *,
+                                                 PyDictObject *,
+                                                 PyDictObject *,
+                                                 const int,
+                                                 const unsigned int);
 
-Py_LOCAL_INLINE(PyObject *) _PyEval_InlineCachedGetAttr(PyCodeObject *,
-                                                        PyObject *,
-                                                        const int,
-                                                        const int);
+static PyObject * _PyEval_InlineCachedGetAttr(PyCodeObject *,
+                                              PyTypeObject *,
+                                              PyObject *,
+                                              PyObject *,
+                                              const int);
 
 /* Forward declarations */
 Py_LOCAL_INLINE(PyObject *) call_function(PyObject ***, Py_ssize_t,
@@ -2577,7 +2578,26 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
         TARGET(LOAD_ATTR) {
             PyObject *name = GETITEM(names, oparg);
             PyObject *owner = TOP();
-            PyObject *res = PyObject_GetAttr(owner, name);
+            PyTypeObject *type = Py_TYPE(owner);
+            PyObject *res;
+
+            if(PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG) &&
+               type->tp_getattro == PyObject_GenericGetAttr &&
+               type->tp_dictoffset > 0)
+            {
+                if (type->tp_dict == NULL) {
+                    if (PyType_Ready(type) < 0) {
+                        Py_DECREF(owner);
+                        SET_TOP(NULL);
+                        goto error;
+                    }
+                }
+                res = _PyEval_InlineCachedGetAttr(co, type, owner,
+                                                  name, OP_CACHE_INDEX());
+            }
+            else {
+                res = PyObject_GetAttr(owner, name);
+            }
             Py_DECREF(owner);
             SET_TOP(res);
             if (res == NULL)
@@ -5149,7 +5169,7 @@ maybe_dtrace_line(PyFrameObject *frame,
 #define GCACHE_OPT_THRESHOLD 256
 
 /* Number of misses, after which to stop caching global variable lookup */
-#define GCACHE_DEOPT_THRESHOLD GCACHE_OPT_THRESHOLD
+#define GCACHE_DEOPT_THRESHOLD (GCACHE_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching an attribute lookup */
 #define ACACHE_OPT_THRESHOLD 256
@@ -5227,8 +5247,9 @@ maybe_dtrace_line(PyFrameObject *frame,
 
 #define CACHE_GLOBALS 1
 #define CACHE_BUILTINS 2
-#define CACHE_ATTRIBUTE 3
-#define CACHE_METHOD 4
+#define CACHE_ATTRIBUTE_DICT 3
+#define CACHE_ATTRIBUTE_DESCR 4
+#define CACHE_METHOD 5
 
 /* Global lookup cache entry */
 
@@ -5238,8 +5259,9 @@ typedef struct {
 } _PyEval_InlineCacheGlobalEntry;
 
 typedef struct {
+    uint64_t ma_version_tag;
     unsigned int tp_version_tag;
-    PyObject *obj;
+    PyObject *attr;
 } _PyEval_InlineCacheAttrEntry;
 
 typedef struct {
@@ -5349,7 +5371,7 @@ Py_ssize_t _PyEval_InlineCacheSize(const PyCodeObject *code) {
 
 Py_LOCAL_INLINE(_PyEval_CacheEntry *)
 _PyEval_LookupInlineCacheIndex(const _PyEval_CacheIndex *cache_index,
-                         const int opcode_offset)
+                               const int opcode_offset)
 {
     uint16_t cache_offset = cache_index->index[opcode_offset];
     if(cache_offset == 0)
@@ -5379,9 +5401,10 @@ static _Bool _PyEval_InlineCacheMiss(PyCodeObject * const co,
             GCACHE_DEOPT_CODE(co);
         }
     }
-    else if (type == CACHE_ATTRIBUTE && misses == ACACHE_DEOPT_THRESHOLD) {
-        if (++cache_index->attribute_deopts
-            == cache_index->attribute_lookup_sites)
+    else if (type == CACHE_ATTRIBUTE_DICT &&
+             misses == ACACHE_DEOPT_THRESHOLD) {
+        if (++cache_index->attribute_deopts ==
+            cache_index->attribute_lookup_sites)
         {
             ACACHE_DEOPT_CODE(co);
         }
@@ -5401,9 +5424,9 @@ static _Bool _PyEval_InlineCacheMiss(PyCodeObject * const co,
 }
 
 static int
-_PyEval_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
-                    PyDictObject *builtins, PyObject* value,
-                    int opcode_offset, const int type)
+_PyEval_InlineCacheGlobal(PyCodeObject *code, PyDictObject *globals,
+                          PyDictObject *builtins, PyObject* value,
+                          int opcode_offset, const int type)
 {
     _PyEval_CacheEntry *cache;
     _PyEval_CacheIndex *cache_index = code->co_op_cache;
@@ -5434,8 +5457,9 @@ _PyEval_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
 }
 
 static int
-_PyEval_InlineCacheAttribute(PyCodeObject *code, PyTypeObject *tp,
-                       PyObject* value, int opcode_offset)
+_PyEval_InlineCacheAttribute(PyCodeObject *code, PyTypeObject *type,
+                             PyDictObject* dict, PyObject *attr,
+                             int opcode_offset)
 {
     _PyEval_CacheEntry *cache;
     _PyEval_CacheIndex *cache_index = code->co_op_cache;
@@ -5450,64 +5474,130 @@ _PyEval_InlineCacheAttribute(PyCodeObject *code, PyTypeObject *tp,
     }
     cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
     if(cache != NULL) {
-        cache->type = CACHE_ATTRIBUTE;
-        cache->data.attr.obj = value;
-        cache->data.attr.tp_version_tag = tp->tp_version_tag;
+        cache->type = CACHE_ATTRIBUTE_DICT;
+        cache->data.attr.tp_version_tag = type->tp_version_tag;
+        cache->data.attr.ma_version_tag = dict->ma_version_tag;
+        cache->data.attr.attr = attr;
+    }
+    return 0;
+}
+
+static int
+_PyEval_InlineCacheAttributeDescr(PyCodeObject *code, PyTypeObject *type,
+                                  PyObject* descr, int opcode_offset)
+{
+    _PyEval_CacheEntry *cache;
+    _PyEval_CacheIndex *cache_index = code->co_op_cache;
+    if(cache_index == NULL) {
+        int success = _PyEval_AllocateInlineCache(code, &cache_index);
+        if(success == -1)
+            return success;
+        else if(success == -2) {
+            return 0;
+        }
+        code->co_op_cache = cache_index;
+    }
+    cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
+    if(cache != NULL) {
+        cache->type = CACHE_ATTRIBUTE_DESCR;
+        cache->data.attr.tp_version_tag = type->tp_version_tag;
+        cache->data.attr.attr = descr;
     }
     return 0;
 }
 
 static PyObject *
-_PyEval_InlineCachedGetAttr(PyCodeObject *code, PyObject *v,
-                      const int name_offset, const int opcode_offset)
+_PyEval_InlineCachedGetAttr(PyCodeObject *code, PyTypeObject *type,
+                            PyObject *owner, PyObject* name,
+                            const int opcode_offset)
 {
-    PyObject *name, *value;
+    PyObject *attr, *descr;
+    descrgetfunc descr_get;
+    PyDictObject *dict, **dictptr;
     _PyEval_CacheIndex *cache_index;
     _PyEval_CacheEntry *cache;
-    PyTypeObject *tp = Py_TYPE(v);
 
     if(ACACHE_IS_DEOPT(code) ||
        code->co_op_cache_counters.attr_lookups < ACACHE_OPT_THRESHOLD)
     {
         if(!ACACHE_IS_DEOPT(code))
             code->co_op_cache_counters.attr_lookups++;
-        name = PyTuple_GET_ITEM(code->co_names, name_offset);
-        return PyObject_GetAttr(v, name);
+        goto load_attr_cached_fallback;
     }
 
     cache_index = code->co_op_cache;
-    if(cache_index == NULL) {
-        int success = _PyEval_AllocateInlineCache(code, &cache_index);
-        if(success == -1)
-            return NULL;
-        else if(success == -2) {
-            CACHE_DEOPT_CODE_ALL(code);
-            name = PyTuple_GET_ITEM(code->co_names, name_offset);
-            return PyObject_GetAttr(v, name);
+    if(cache_index != NULL) {
+        cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
+        if(cache == NULL) {
+            /* This op has been de-optimized */
+            goto load_attr_cached_fallback;
         }
-        code->co_op_cache = cache_index;
+        if(cache->data.attr.tp_version_tag == type->tp_version_tag) {
+            if (cache->type == CACHE_ATTRIBUTE_DICT) {
+                dictptr = (PyDictObject **) 
+                          ((char *)owner + type->tp_dictoffset);
+                dict = *dictptr;
+                if (dict != NULL) {
+                    if(cache->data.attr.ma_version_tag ==
+                       dict->ma_version_tag)
+                    {
+                        attr = cache->data.attr.attr;
+                        Py_INCREF(attr);
+                        return attr;
+                    }
+                }
+            }
+            else if (cache->type == CACHE_ATTRIBUTE_DESCR) {
+                descr = cache->data.attr.attr;
+                descr_get = descr->ob_type->tp_descr_get;
+                if(descr_get != NULL) {
+                    return descr_get(descr, owner, (PyObject *)type);
+                }
+            }
+        }
+        /* Cache miss */
+        if (!_PyEval_InlineCacheMiss(code, cache_index, cache,
+                                     opcode_offset, CACHE_ATTRIBUTE_DICT))
+            goto load_attr_cached_fallback;
     }
-    cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
-    if(cache == NULL) {
-        name = PyTuple_GET_ITEM(code->co_names, name_offset);
-        return PyObject_GetAttr(v, name);
-    }
-    // We're still not doing cache lookups at this point
-    // but we'll get there
 
-    // cache_index will be set from this point onwards
-    name = PyTuple_GET_ITEM(code->co_names, name_offset);
-    value = PyObject_GetAttr(v, name);
-    if(value != NULL) {
-        if(PyType_HasFeature(tp, Py_TPFLAGS_VALID_VERSION_TAG) &&
-           tp->tp_getattro ==  PyObject_GenericGetAttr)
-        {
-            if(_PyEval_InlineCacheAttribute(code, tp,
-                                            value, opcode_offset) == -1)
-                return NULL;
+    descr = _PyType_Lookup(type, name);
+    if (descr != NULL && 
+        descr->ob_type->tp_descr_get != NULL && PyDescr_IsData(descr))
+    {
+        if(_PyEval_InlineCacheAttributeDescr(code, type,
+                                             descr, opcode_offset) == -1)
+            return NULL;
+        descr_get = descr->ob_type->tp_descr_get;
+        return descr_get(descr, owner, (PyObject *)type);
+    }
+    else if (descr == NULL || descr->ob_type->tp_descr_get == NULL ||
+             !PyDescr_IsData(descr))
+    {
+        dictptr = (PyDictObject **) ((char *)owner + type->tp_dictoffset);
+        dict = *dictptr;
+        if (dict != NULL && PyDict_CheckExact(dict)) {
+            attr = PyDict_GetItem((PyObject *)dict, name);
+            if(attr != NULL) {
+                if(_PyEval_InlineCacheAttribute(code, type, dict,
+                                                attr, opcode_offset) == -1)
+                    return NULL;
+                Py_INCREF(attr);
+                return attr;
+            }
         }
     }
-    return value;
+    /* Dynamic value, deopt immediately */
+    if(cache_index != NULL) {
+        cache_index->index[opcode_offset] = 0;
+        if (++cache_index->attribute_deopts
+            == cache_index->attribute_lookup_sites)
+        {
+            ACACHE_DEOPT_CODE(code);
+        }
+    }
+load_attr_cached_fallback:
+    return PyObject_GetAttr(owner, name);
 }
 
 
@@ -5567,8 +5657,8 @@ load_global_cached_fallback:
     key = PyTuple_GET_ITEM(code->co_names, name_offset);
     value = _PyDict_LoadGlobal(globals, builtins, key, &where);
     if(value != NULL && populate_cache) {
-        if(_PyEval_CacheGlobal(code, globals, builtins, value,
-                               opcode_offset, where) == -1)
+        if(_PyEval_InlineCacheGlobal(code, globals, builtins, value,
+                                     opcode_offset, where) == -1)
             return NULL;
     }
     return value;
