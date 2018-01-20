@@ -5233,10 +5233,30 @@ maybe_dtrace_line(PyFrameObject *frame,
 /* Global lookup cache entry */
 
 typedef struct {
-    uint64_t version_tag;
+    uint64_t ma_version_tag;
     PyObject *obj;
+} _PyEval_InlineCacheGlobalEntry;
+
+typedef struct {
+    unsigned int tp_version_tag;
+    PyObject *obj;
+} _PyEval_InlineCacheAttrEntry;
+
+typedef struct {
+    unsigned int tp_version_tag;
+    PyObject *obj;
+} _PyEval_InlineCacheMethodEntry;
+
+typedef union {
+    _PyEval_InlineCacheGlobalEntry global;
+    _PyEval_InlineCacheAttrEntry attr;
+   _PyEval_InlineCacheMethodEntry method;
+} _PyEval_InlineCacheCombinedEntry;
+
+typedef struct {
     uint8_t type;
     uint16_t misses;
+    _PyEval_InlineCacheCombinedEntry data;
 } _PyEval_CacheEntry;
 
 
@@ -5398,15 +5418,15 @@ _PyEval_CacheGlobal(PyCodeObject *code, PyDictObject *globals,
     }
     cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
     if(cache != NULL) {
-        cache->obj = value;
-        cache->version_tag = globals->ma_version_tag;
+        cache->data.global.obj = value;
+        cache->data.global.ma_version_tag = globals->ma_version_tag;
         if(type == CACHE_GLOBALS) {
             cache->type = CACHE_GLOBALS;
         }
         else {
             cache->type = CACHE_BUILTINS;
-            if(builtins->ma_version_tag > cache->version_tag)
-                cache->version_tag = builtins->ma_version_tag;
+            if(builtins->ma_version_tag > globals->ma_version_tag)
+                cache->data.global.ma_version_tag = builtins->ma_version_tag;
         }
         cache_index->globals_opts++;
     }
@@ -5430,9 +5450,9 @@ _PyEval_InlineCacheAttribute(PyCodeObject *code, PyTypeObject *tp,
     }
     cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
     if(cache != NULL) {
-        cache->obj = value;
-        cache->version_tag = tp->tp_version_tag;
         cache->type = CACHE_ATTRIBUTE;
+        cache->data.attr.obj = value;
+        cache->data.attr.tp_version_tag = tp->tp_version_tag;
     }
     return 0;
 }
@@ -5510,7 +5530,7 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *code,
     _PyEval_CacheIndex *cache_index;
     _PyEval_CacheEntry *cache;
     int where;
-    uint64_t version_tag;
+    uint64_t ma_version_tag;
     _Bool populate_cache = 1;
 
     if(GCACHE_IS_DEOPT(code) ||
@@ -5525,17 +5545,18 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *code,
     if(cache_index != NULL) {
         cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
         if(cache != NULL) {
-            if(cache->type == CACHE_GLOBALS) {
-                if(cache->version_tag == globals->ma_version_tag) {
-                    return cache->obj;
-                }
+            if(cache->type == CACHE_GLOBALS &&
+               cache->data.global.ma_version_tag == globals->ma_version_tag)
+            {
+                return cache->data.global.obj;
             }
             else if(cache->type == CACHE_BUILTINS) {
-                version_tag = globals->ma_version_tag;
-                if(builtins->ma_version_tag > version_tag)
-                    version_tag = builtins->ma_version_tag;
-                if(cache->version_tag == version_tag)
-                    return cache->obj;
+                ma_version_tag = globals->ma_version_tag;
+                /* This is highly unlikely */
+                if(builtins->ma_version_tag > ma_version_tag)
+                    ma_version_tag = builtins->ma_version_tag;
+                if(cache->data.global.ma_version_tag == ma_version_tag)
+                    return cache->data.global.obj;
             }
             populate_cache = _PyEval_InlineCacheMiss(code, cache_index,
                                                      cache, opcode_offset,
