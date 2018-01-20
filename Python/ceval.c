@@ -5226,11 +5226,8 @@ maybe_dtrace_line(PyFrameObject *frame,
 /* These two values mirror what _PyDict_LoadGlobal sets in its where argument */
 
 #define CACHE_GLOBALS 1
-
 #define CACHE_BUILTINS 2
-
 #define CACHE_ATTRIBUTE 3
-
 #define CACHE_METHOD 4
 
 /* Global lookup cache entry */
@@ -5238,7 +5235,7 @@ maybe_dtrace_line(PyFrameObject *frame,
 typedef struct {
     uint64_t version_tag;
     PyObject *obj;
-    uint16_t type;
+    uint8_t type;
     uint16_t misses;
 } _PyEval_CacheEntry;
 
@@ -5344,9 +5341,43 @@ _PyEval_LookupInlineCacheIndex(const _PyEval_CacheIndex *cache_index,
     return base + (cache_offset - 1);
 }
 
-static void _PyEval_DeoptimizeOp(_PyEval_CacheIndex * const cache_index,
-                                 const int opcode_offset) {
+static _Bool _PyEval_InlineCacheMiss(PyCodeObject * const co,
+                                     _PyEval_CacheIndex *cache_index,
+                                     _PyEval_CacheEntry *cache,
+                                     const int opcode_offset,
+                                     const uint8_t type)
+{
+    _Bool deoptimize = 0;
+    uint16_t misses = ++cache->misses;
+
+    cache->type = CACHE_UNITIALIZED;
+    if (type == CACHE_GLOBALS && misses == GCACHE_DEOPT_THRESHOLD) {
+        deoptimize = 1;
+        if (++cache_index->globals_deopts
+            == cache_index->globals_lookup_sites)
+        {
+            GCACHE_DEOPT_CODE(co);
+        }
+    }
+    else if (type == CACHE_ATTRIBUTE && misses == ACACHE_DEOPT_THRESHOLD) {
+        if (++cache_index->attribute_deopts
+            == cache_index->attribute_lookup_sites)
+        {
+            ACACHE_DEOPT_CODE(co);
+        }
+    }
+    else if (type == CACHE_METHOD && misses == MCACHE_DEOPT_THRESHOLD) {
+        if (++cache_index->method_deopts
+            == cache_index->method_lookup_sites)
+        {
+            MCACHE_DEOPT_CODE(co);
+        }
+    }
+    if(deoptimize) {
         cache_index->index[opcode_offset] = 0;
+        return 0;
+    }
+    return 1;
 }
 
 static int
@@ -5506,17 +5537,9 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *code,
                 if(cache->version_tag == version_tag)
                     return cache->obj;
             }
-            cache->type = CACHE_UNITIALIZED;
-            if(++(cache->misses) == GCACHE_DEOPT_THRESHOLD) {
-                _PyEval_DeoptimizeOp(code->co_op_cache, opcode_offset);
-                if(++cache_index->globals_deopts ==
-                   cache_index->globals_lookup_sites)
-                {
-                    GCACHE_DEOPT_CODE(code);
-                }
-                populate_cache = 0;
-                goto load_global_cached_fallback;
-            }
+            populate_cache = _PyEval_InlineCacheMiss(code, cache_index,
+                                                     cache, opcode_offset,
+                                                     CACHE_GLOBALS);
         }
     }
 load_global_cached_fallback:
