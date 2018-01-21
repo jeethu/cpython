@@ -5270,7 +5270,7 @@ typedef struct {
     PyObject *attr;
 } _PyEval_InlineCacheAttrEntry;
 
-/* attr and method entry structure are the same */
+/* attr and method entries use the same structure */
 
 typedef union {
     _PyEval_InlineCacheGlobalEntry global;
@@ -5285,16 +5285,18 @@ typedef struct {
 
 
 typedef struct {
-    uint16_t index_size;  /* In bytes */
+    uint16_t index_size;  /* In bytes. */
+    /*
+     * n_cache_entries is the number of
+     * _PyEval_CacheEntry objects, not bytes.
+     */
+    uint16_t n_cache_entries;
     uint16_t globals_lookup_sites;
     uint16_t attribute_lookup_sites;
     uint16_t method_lookup_sites;
     uint16_t globals_deopts;
     uint16_t attribute_deopts;
     uint16_t method_deopts;
-    uint16_t globals_opts;
-    uint16_t attribute_opts;
-    uint16_t method_opts;
     uint16_t index[];
 } _PyEval_CacheIndex;
 
@@ -5306,6 +5308,7 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
     Py_ssize_t n_opcodes =  code_len / sizeof(_Py_CODEUNIT);
     _PyEval_CacheIndex *mem;
     _Py_CODEUNIT *first_instr, *instr;
+    uint16_t *globals_opt_buffer = NULL;
     uint16_t global_instrs = 0, attr_instrs = 0, method_instrs = 0;
 
     if(n_opcodes == 0 || n_opcodes >= UINT16_MAX) {
@@ -5317,40 +5320,70 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
         return -2;
     }
 
-    first_instr = (_Py_CODEUNIT *) PyBytes_AS_STRING(code->co_code);
+    globals_opt_buffer = (uint16_t *)
+            PyMem_Calloc(PyTuple_GET_SIZE(code->co_names),
+                         sizeof(uint16_t));
+    if(globals_opt_buffer == NULL)
+        return -1;
+
+    first_instr = (_Py_CODEUNIT *)
+            PyBytes_AS_STRING(code->co_code);
     instr = first_instr;
     for(int i=0; i < n_opcodes; i++, instr++) {
         int opcode = _Py_OPCODE(*instr);
-        if(opcode == LOAD_GLOBAL || opcode == LOAD_ATTR || opcode == LOAD_METHOD) {
-            if(opcode == LOAD_GLOBAL)
+        int oparg = _Py_OPARG(*instr);
+        if(opcode == LOAD_GLOBAL ||
+                opcode == LOAD_ATTR || opcode == LOAD_METHOD) {
+            if(opcode == LOAD_GLOBAL) {
                 global_instrs++;
-            if(opcode == LOAD_ATTR)
+                if(globals_opt_buffer[oparg] == 0) {
+                    globals_opt_buffer[oparg] = 1;
+                    cacheable_ops++;
+                }
+            }
+            if(opcode == LOAD_ATTR) {
                 attr_instrs++;
-            if(opcode == LOAD_METHOD)
+                cacheable_ops++;
+            }
+            if(opcode == LOAD_METHOD) {
                 method_instrs++;
-            cacheable_ops++;
+                cacheable_ops++;
+            }
         }
     }
+
+    if(global_instrs > 0)
+        memset(globals_opt_buffer, 0,
+               sizeof(uint16_t) * PyTuple_GET_SIZE(code->co_names));
 
     to_allocate = sizeof(_PyEval_CacheIndex) + code_len +
                   (sizeof(_PyEval_CacheEntry) * cacheable_ops);
 
-    mem = (_PyEval_CacheIndex *)
-           PyMem_Calloc(1, to_allocate);
+    mem = (_PyEval_CacheIndex *) PyMem_Calloc(1, to_allocate);
     if(mem == NULL) {
+        PyMem_FREE(globals_opt_buffer);
         return -1;
     }
+
     mem->index_size = code_len;
+    mem->n_cache_entries = cacheable_ops;
     mem->globals_lookup_sites = global_instrs;
     mem->attribute_lookup_sites = attr_instrs;
     mem->method_lookup_sites = method_instrs;
 
     instr = first_instr;
-    for(int i=0, j=1; i < n_opcodes; i++, instr++) {
+    for(int i = 0, j = 1; i < n_opcodes; i++, instr++) {
         int opcode = _Py_OPCODE(*instr);
-        if(opcode == LOAD_GLOBAL || opcode == LOAD_ATTR || opcode == LOAD_METHOD)
+        int oparg = _Py_OPARG(*instr);
+        if (opcode == LOAD_GLOBAL) {
+            if (globals_opt_buffer[oparg] == 0)
+                globals_opt_buffer[oparg] = j++;
+            mem->index[i] = globals_opt_buffer[oparg];
+        }
+        else if(opcode == LOAD_ATTR || opcode == LOAD_METHOD)
             mem->index[i] = j++;
     }
+    PyMem_FREE(globals_opt_buffer);
     *ptr = mem;
     return 0;
 }
@@ -5366,9 +5399,7 @@ Py_ssize_t _PyEval_InlineCacheSize(const PyCodeObject *code) {
         return ((sizeof(_PyEval_CacheIndex)
                  + (Py_ssize_t)cache_index->index_size)
                  + (sizeof(_PyEval_CacheEntry) *
-                   ((Py_ssize_t)cache_index->globals_lookup_sites
-                    + (Py_ssize_t)cache_index->attribute_lookup_sites
-                    + (Py_ssize_t)cache_index->method_lookup_sites)));
+                   ((Py_ssize_t)cache_index->n_cache_entries)));
     }
 }
 
@@ -5467,7 +5498,6 @@ _PyEval_InlineCacheGlobal(PyCodeObject *code, PyDictObject *globals,
                           int opcode_offset, const int type)
 {
     _PyEval_CacheEntry *cache = NULL;
-    _PyEval_CacheIndex *cache_index;
     int success = _PyEval_InlineCacheAllocateAndLookup(code,
                                                        opcode_offset,
                                                        &cache);
@@ -5484,9 +5514,6 @@ _PyEval_InlineCacheGlobal(PyCodeObject *code, PyDictObject *globals,
             if(builtins->ma_version_tag > globals->ma_version_tag)
                 cache->data.global.ma_version_tag = builtins->ma_version_tag;
         }
-        cache_index = code->co_op_cache;
-        if(cache_index)
-            cache_index->globals_opts++;
     }
     return 0;
 }
@@ -5497,7 +5524,6 @@ _PyEval_InlineCacheAttributeDict(PyCodeObject *code, PyTypeObject *type,
                                  int opcode_offset)
 {
     _PyEval_CacheEntry *cache = NULL;
-    _PyEval_CacheIndex *cache_index;
     int success = _PyEval_InlineCacheAllocateAndLookup(code,
                                                        opcode_offset,
                                                        &cache);
@@ -5509,9 +5535,6 @@ _PyEval_InlineCacheAttributeDict(PyCodeObject *code, PyTypeObject *type,
         cache->data.attr.tp_version_tag = type->tp_version_tag;
         cache->data.attr.ma_version_tag = dict->ma_version_tag;
         cache->data.attr.attr = attr;
-        cache_index = code->co_op_cache;
-        if(cache_index)
-            cache_index->attribute_opts++;
     }
     return 0;
 }
@@ -5521,7 +5544,6 @@ _PyEval_InlineCacheAttributeDescr(PyCodeObject *code, PyTypeObject *type,
                                   PyObject* descr, int opcode_offset)
 {
     _PyEval_CacheEntry *cache = NULL;
-    _PyEval_CacheIndex *cache_index;
     int success = _PyEval_InlineCacheAllocateAndLookup(code,
                                                        opcode_offset,
                                                        &cache);
@@ -5532,9 +5554,6 @@ _PyEval_InlineCacheAttributeDescr(PyCodeObject *code, PyTypeObject *type,
         cache->type = CACHE_ATTRIBUTE_DESCR;
         cache->data.attr.tp_version_tag = type->tp_version_tag;
         cache->data.attr.attr = descr;
-        cache_index = code->co_op_cache;
-        if(cache_index)
-            cache_index->attribute_opts++;
     }
     return 0;
 }
@@ -5546,7 +5565,6 @@ _PyEval_InlineCacheMethodObject(PyCodeObject *code, PyObject *obj,
     PyTypeObject *type;
     PyDictObject *dict;
     _PyEval_CacheEntry *cache = NULL;
-    _PyEval_CacheIndex *cache_index;
     int success = _PyEval_InlineCacheAllocateAndLookup(code,
                                                        opcode_offset,
                                                        &cache);
@@ -5562,9 +5580,6 @@ _PyEval_InlineCacheMethodObject(PyCodeObject *code, PyObject *obj,
         cache->type = CACHE_METHOD;
         cache->data.attr.tp_version_tag = type->tp_version_tag;
         cache->data.attr.attr = method;
-        cache_index = code->co_op_cache;
-        if(cache_index)
-            cache_index->method_opts++;
     }
     return 0;
 }
