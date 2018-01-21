@@ -5731,7 +5731,7 @@ _PyEval_InlineCachedGetMethod(PyCodeObject *code, PyObject *obj,
     PyObject **dictptr, *dict;
     PyObject *attr;
     int meth_found = 0;
-    _PyEval_CacheEntry *cache;
+    _PyEval_CacheEntry *cache = NULL;
     _PyEval_CacheIndex *cache_index;
 
     assert(*method == NULL);
@@ -5814,6 +5814,11 @@ _PyEval_InlineCachedGetMethod(PyCodeObject *code, PyObject *obj,
     descr = _PyType_Lookup(tp, name);
     if (descr != NULL) {
         Py_INCREF(descr);
+        if(_PyEval_InlineCacheMethodDescr(
+                code, tp, descr, opcode_offset) == -1) {
+            Py_XDECREF(descr);
+            return 0;
+        }
         if (PyFunction_Check(descr) ||
                 (Py_TYPE(descr) == &PyMethodDescr_Type)) {
             meth_found = 1;
@@ -5847,39 +5852,22 @@ _PyEval_InlineCachedGetMethod(PyCodeObject *code, PyObject *obj,
     }
 
     if (meth_found) {
-        if(_PyEval_InlineCacheMethodDescr(
-                code, tp, descr, opcode_offset) == -1) {
-            Py_XDECREF(descr);
-            return 0;
-        }
         *method = descr;
         return 1;
     }
 
+
     if (f != NULL) {
-        if(_PyEval_InlineCacheMethodDescr(
-                code, tp, descr, opcode_offset) == -1) {
-            Py_DECREF(descr);
-            return 0;
-        }
         *method = f(descr, obj, (PyObject *)Py_TYPE(obj));
         Py_DECREF(descr);
         return 0;
     }
 
     if (descr != NULL) {
-        if(_PyEval_InlineCacheMethodDescr(
-                code, tp, descr, opcode_offset) == -1) {
-            Py_DECREF(descr);
-            return 0;
-        }
         *method = descr;
         return 0;
     }
 
-    /* Register a cache miss */
-    if (!_PyEval_InlineCacheMiss(code, cache_index, cache,
-                                 opcode_offset, CACHE_METHOD_DICT))
     PyErr_Format(PyExc_AttributeError,
                  "'%.50s' object has no attribute '%U'",
                  tp->tp_name, name);
