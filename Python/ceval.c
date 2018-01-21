@@ -33,20 +33,18 @@ extern int _PyObject_GetMethod(PyObject *, PyObject *, PyObject **);
 
 typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 
-/* Private API for the LOAD_GLOBAL opcode. */
-static PyObject * _PyEval_InlineCachedLoadGlobal(PyCodeObject *,
-                                                 PyDictObject *,
-                                                 PyDictObject *,
-                                                 const int,
-                                                 const unsigned int);
+/* Forward declaration to support caching in the LOAD_GLOBAL opcode. */
+Py_LOCAL_INLINE(PyObject *) _Py_HOT_FUNCTION
+_PyEval_InlineCachedLoadGlobal(PyCodeObject *, PyDictObject *,
+                               PyDictObject *, const int, const unsigned int);
 
-static PyObject * _PyEval_InlineCachedGetAttr(PyCodeObject *,
-                                              PyTypeObject *,
-                                              PyObject *,
-                                              PyObject *,
-                                              const int);
+/* Forward declaration to support caching in the LOAD_ATTR opcode. */
+Py_LOCAL_INLINE(PyObject *) _Py_HOT_FUNCTION
+_PyEval_InlineCachedGetAttr(PyCodeObject *, PyTypeObject *,
+                            PyObject *, PyObject *, const int);
 
-static int
+/* Forward declaration to support caching in the LOAD_METHOD opcode. */
+Py_LOCAL_INLINE(int) _Py_HOT_FUNCTION
 _PyEval_InlineCachedGetMethod(PyCodeObject *, PyObject *,
                               PyObject *, PyObject **,
                               const int);
@@ -5172,22 +5170,22 @@ maybe_dtrace_line(PyFrameObject *frame,
  */
 
 /* Number of calls, after which to start caching a global variable lookup */
-#define GCACHE_OPT_THRESHOLD 256
+#define GCACHE_OPT_THRESHOLD 512
 
 /* Number of misses, after which to stop caching global variable lookup */
-#define GCACHE_DEOPT_THRESHOLD (GCACHE_OPT_THRESHOLD / 2)
+#define GCACHE_DEOPT_THRESHOLD GCACHE_OPT_THRESHOLD
 
 /* Number of calls, after which to start caching an attribute lookup */
-#define ACACHE_OPT_THRESHOLD 256
+#define ACACHE_OPT_THRESHOLD 512
 
 /* Number of misses, after which to stop caching an attribute lookup */
-#define ACACHE_DEOPT_THRESHOLD (ACACHE_OPT_THRESHOLD / 2)
+#define ACACHE_DEOPT_THRESHOLD ACACHE_OPT_THRESHOLD
 
 /* Number of calls, after which to start caching a method lookup */
-#define MCACHE_OPT_THRESHOLD 256
+#define MCACHE_OPT_THRESHOLD 512
 
 /* Number of misses, after which to stop caching a method lookup */
-#define MCACHE_DEOPT_THRESHOLD (MCACHE_OPT_THRESHOLD / 2)
+#define MCACHE_DEOPT_THRESHOLD MCACHE_OPT_THRESHOLD
 
 #define GCACHE_IS_DEOPT(x) (x->co_op_cache_counters.global_lookups == -1)
 
@@ -5459,7 +5457,6 @@ static _Bool _PyEval_InlineCacheMiss(PyCodeObject * const co,
     return 1;
 }
 
-
 static PyDictObject *
 _PyEval_InlineCacheGetDictPtr(PyObject* obj)
 {
@@ -5593,7 +5590,7 @@ _PyEval_InlineCacheMethodObject(PyCodeObject *code, PyObject *obj,
  * function (Raise an exception and return NULL if an error occurred,
  * return NULL if the key doesn't exist and Return the value if the key exists.)
  */
-static PyObject *
+Py_LOCAL_INLINE(PyObject *) _Py_HOT_FUNCTION
 _PyEval_InlineCachedLoadGlobal(PyCodeObject *code,
                                PyDictObject *globals, PyDictObject *builtins,
                                const int name_offset,
@@ -5650,7 +5647,7 @@ load_global_cached_fallback:
 /* A caching version of attribute lookup (LOAD_ATTR).
  * Falls back on PyObject_GetAttr
  */
-static PyObject *
+Py_LOCAL_INLINE(PyObject *) _Py_HOT_FUNCTION
 _PyEval_InlineCachedGetAttr(PyCodeObject *code, PyTypeObject *type,
                             PyObject *owner, PyObject* name,
                             const int opcode_offset)
@@ -5738,11 +5735,10 @@ load_attr_cached_fallback:
     return PyObject_GetAttr(owner, name);
 }
 
-/* A caching version of method lookup (LOAD_METHOD).
- * essentially _PyObject_GetMethod with added caching
- * also uses _PyObject_GetMethod as a fallback
+/* A caching version of method lookup (LOAD_METHOD),
+ * uses _PyObject_GetMethod as a fallback.
  */
-static int
+Py_LOCAL_INLINE(int) _Py_HOT_FUNCTION
 _PyEval_InlineCachedGetMethod(PyCodeObject *code, PyObject *obj,
                               PyObject *name, PyObject **method,
                               const int opcode_offset)
@@ -5756,14 +5752,6 @@ _PyEval_InlineCachedGetMethod(PyCodeObject *code, PyObject *obj,
 
     assert(*method == NULL);
 
-    if(MCACHE_IS_DEOPT(code) ||
-       code->co_op_cache_counters.method_lookups < MCACHE_OPT_THRESHOLD)
-    {
-        if(!MCACHE_IS_DEOPT(code))
-            code->co_op_cache_counters.method_lookups++;
-        return _PyObject_GetMethod(obj, name, method);
-    }
-
     if (Py_TYPE(obj)->tp_getattro != PyObject_GenericGetAttr
             || !PyUnicode_Check(name)) {
         *method = PyObject_GetAttr(obj, name);
@@ -5772,6 +5760,14 @@ _PyEval_InlineCachedGetMethod(PyCodeObject *code, PyObject *obj,
 
     if (tp->tp_dict == NULL && PyType_Ready(tp) < 0)
         return 0;
+
+    if(MCACHE_IS_DEOPT(code) ||
+       code->co_op_cache_counters.method_lookups < MCACHE_OPT_THRESHOLD)
+    {
+        if(!MCACHE_IS_DEOPT(code))
+            code->co_op_cache_counters.method_lookups++;
+        return _PyObject_GetMethod(obj, name, method);
+    }
 
     cache_index = code->co_op_cache;
     if(cache_index != NULL) {
