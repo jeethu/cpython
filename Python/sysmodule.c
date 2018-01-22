@@ -40,6 +40,8 @@ module sys
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=3726b388feee8cea]*/
 
 #include "clinic/sysmodule.c.h"
+/* Private API from ceval.c */
+int _PyEval_DebugInlineCacheStats(FILE *);
 
 _Py_IDENTIFIER(_);
 _Py_IDENTIFIER(__sizeof__);
@@ -1439,6 +1441,22 @@ In Py_DEBUG mode, also perform some expensive internal consistency\n\
 checks.\n\
 ");
 
+
+static PyObject *
+sys_debuginlinecachestats(PyObject *self, PyObject *args) {
+    if (_PyEval_DebugInlineCacheStats(stderr)) {
+        fputc('\n', stderr);
+    }
+    Py_RETURN_NONE;
+}
+PyDoc_STRVAR(debuginlinecachestats_doc,
+"_debuginlinecachestats()\n\
+\n\
+In Py_DEBUG mode,\n\
+print summary statistics to stderr on the inline cache.\n\
+\n\
+");
+
 #ifdef Py_TRACE_REFS
 /* Defined in objects.c because it uses static globals if that file */
 extern PyObject *_Py_GetObjects(PyObject *, PyObject *);
@@ -1565,6 +1583,8 @@ static PyMethodDef sys_methods[] = {
     {"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
     {"_debugmallocstats", sys_debugmallocstats, METH_NOARGS,
      debugmallocstats_doc},
+    {"_debuginlinecachestats", sys_debuginlinecachestats, METH_NOARGS,
+     debuginlinecachestats_doc},
     SYS_SET_COROUTINE_ORIGIN_TRACKING_DEPTH_METHODDEF
     SYS_GET_COROUTINE_ORIGIN_TRACKING_DEPTH_METHODDEF
     {"set_coroutine_wrapper", sys_set_coroutine_wrapper, METH_O,
