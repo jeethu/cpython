@@ -5335,42 +5335,45 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
     _Py_CODEUNIT *first_instr, *instr;
     uint16_t global_instrs = 0, attr_instrs = 0, method_instrs = 0;
     Py_ssize_t buf_len = PyTuple_GET_SIZE(code->co_names) * sizeof(uint16_t);
+    uint16_t globals_opt_buffer[buf_len];
+    uint16_t attr_opt_buffer[buf_len];
 
-    if(n_opcodes == 0 || n_opcodes >= UINT16_MAX) {
+    if(n_opcodes >= UINT16_MAX ||
+            PyTuple_GET_SIZE(code->co_names) >= UINT16_MAX) {
         /*
-         * Cannot optimize code objects with no op codes or >= 2**16 ops
+         * Cannot optimize code objects with >= 2**16 ops
          * disable all caching for this code object
          */
         CACHE_DEOPT_CODE_ALL(code);
         return -2;
     }
 
-    uint16_t globals_opt_buffer[buf_len];
     memset(globals_opt_buffer, 0, buf_len);
+    memset(attr_opt_buffer, 0, buf_len);
 
     first_instr = (_Py_CODEUNIT *)
             PyBytes_AS_STRING(code->co_code);
     instr = first_instr;
-    for(int i=0; i < n_opcodes; i++, instr++) {
+    for (int i=0; i < n_opcodes; i++, instr++) {
         int opcode = _Py_OPCODE(*instr);
         int oparg = _Py_OPARG(*instr);
-        if(opcode == LOAD_GLOBAL ||
-                opcode == LOAD_ATTR || opcode == LOAD_METHOD) {
-            if(opcode == LOAD_GLOBAL) {
-                global_instrs++;
-                if(globals_opt_buffer[oparg] == 0) {
-                    globals_opt_buffer[oparg] = UINT16_MAX;
-                    cacheable_ops++;
-                }
-            }
-            if(opcode == LOAD_ATTR) {
-                attr_instrs++;
+        if (opcode == LOAD_GLOBAL) {
+            global_instrs++;
+            if (globals_opt_buffer[oparg] == 0) {
+                globals_opt_buffer[oparg] = UINT16_MAX;
                 cacheable_ops++;
             }
-            if(opcode == LOAD_METHOD) {
-                method_instrs++;
+        }
+        if (opcode == LOAD_ATTR) {
+            attr_instrs++;
+            if (attr_opt_buffer[oparg] == 0) {
+                attr_opt_buffer[oparg] = UINT16_MAX;
                 cacheable_ops++;
             }
+        }
+        if (opcode == LOAD_METHOD) {
+            method_instrs++;
+            cacheable_ops++;
         }
     }
 
@@ -5393,12 +5396,18 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
         int opcode = _Py_OPCODE(*instr);
         int oparg = _Py_OPARG(*instr);
         if (opcode == LOAD_GLOBAL) {
-            if (globals_opt_buffer[oparg] == 0
-                    || globals_opt_buffer[oparg] == UINT16_MAX)
+            if (globals_opt_buffer[oparg] == 0 ||
+                    globals_opt_buffer[oparg] == UINT16_MAX)
                 globals_opt_buffer[oparg] = j++;
             mem->index[i] = globals_opt_buffer[oparg];
         }
-        else if(opcode == LOAD_ATTR || opcode == LOAD_METHOD)
+        else if (opcode == LOAD_ATTR) {
+            if (attr_opt_buffer[oparg] == 0 ||
+                    attr_opt_buffer[oparg] == UINT16_MAX)
+                attr_opt_buffer[oparg] = j++;
+            mem->index[i] = attr_opt_buffer[oparg];
+        }
+        else if(opcode == LOAD_METHOD)
             mem->index[i] = j++;
     }
     *ptr = mem;
