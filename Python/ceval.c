@@ -38,6 +38,10 @@ Py_LOCAL_INLINE(PyObject *) _Py_HOT_FUNCTION
 _PyEval_InlineCachedLoadGlobal(PyCodeObject *, PyDictObject *,
                                PyDictObject *, const int, const unsigned int);
 
+Py_LOCAL_INLINE(void) _Py_HOT_FUNCTION
+_PyEval_InlineCacheStoreGlobal(PyCodeObject *, PyDictObject *,
+                               PyObject *, const unsigned int);
+
 /* Forward declaration to support caching in the LOAD_ATTR opcode. */
 Py_LOCAL_INLINE(PyObject *) _Py_HOT_FUNCTION
 _PyEval_InlineCachedGetAttr(PyCodeObject *, PyTypeObject *,
@@ -2043,6 +2047,13 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             PyObject *v = POP();
             int err;
             err = PyDict_SetItem(f->f_globals, name, v);
+            if(err == 0 && co->co_op_cache != NULL &&
+                    PyDict_CheckExact(f->f_globals))
+            {
+                _PyEval_InlineCacheStoreGlobal(co,
+                                               (PyDictObject *)f->f_globals,
+                                               v, OP_CACHE_INDEX());
+            }
             Py_DECREF(v);
             if (err != 0)
                 goto error;
@@ -5181,22 +5192,22 @@ maybe_dtrace_line(PyFrameObject *frame,
  */
 
 /* Number of calls, after which to start caching a global variable lookup */
-#define GCACHE_OPT_THRESHOLD 64
+#define GCACHE_OPT_THRESHOLD 67
 
 /* Number of misses, after which to stop caching global variable lookup */
-#define GCACHE_DEOPT_THRESHOLD GCACHE_OPT_THRESHOLD
+#define GCACHE_DEOPT_THRESHOLD 730
 
 /* Number of calls, after which to start caching an attribute lookup */
-#define ACACHE_OPT_THRESHOLD 8
+#define ACACHE_OPT_THRESHOLD 48
 
 /* Number of misses, after which to stop caching an attribute lookup */
-#define ACACHE_DEOPT_THRESHOLD ACACHE_OPT_THRESHOLD
+#define ACACHE_DEOPT_THRESHOLD 792
 
 /* Number of calls, after which to start caching a method lookup */
-#define MCACHE_OPT_THRESHOLD 8
+#define MCACHE_OPT_THRESHOLD 160
 
 /* Number of misses, after which to stop caching a method lookup */
-#define MCACHE_DEOPT_THRESHOLD MCACHE_OPT_THRESHOLD
+#define MCACHE_DEOPT_THRESHOLD 1020
 
 #define GCACHE_IS_DEOPT(x) (x->co_op_cache_counters.global_lookups == -1)
 
@@ -5337,6 +5348,7 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
     Py_ssize_t buf_len = PyTuple_GET_SIZE(code->co_names) * sizeof(uint16_t);
     uint16_t globals_opt_buffer[buf_len];
     uint16_t attr_opt_buffer[buf_len];
+    int oparg, opcode;
 
     if(n_opcodes >= UINT16_MAX ||
             PyTuple_GET_SIZE(code->co_names) >= UINT16_MAX) {
@@ -5355,8 +5367,8 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
             PyBytes_AS_STRING(code->co_code);
     instr = first_instr;
     for (int i=0; i < n_opcodes; i++, instr++) {
-        int opcode = _Py_OPCODE(*instr);
-        int oparg = _Py_OPARG(*instr);
+        opcode = _Py_OPCODE(*instr);
+        oparg = _Py_OPARG(*instr);
         if (opcode == LOAD_GLOBAL) {
             global_instrs++;
             if (globals_opt_buffer[oparg] == 0) {
@@ -5393,8 +5405,8 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
 
     instr = first_instr;
     for(int i = 0, j = 1; i < n_opcodes; i++, instr++) {
-        int opcode = _Py_OPCODE(*instr);
-        int oparg = _Py_OPARG(*instr);
+        opcode = _Py_OPCODE(*instr);
+        oparg = _Py_OPARG(*instr);
         if (opcode == LOAD_GLOBAL) {
             if (globals_opt_buffer[oparg] == 0 ||
                     globals_opt_buffer[oparg] == UINT16_MAX)
@@ -5409,6 +5421,16 @@ _PyEval_AllocateInlineCache(PyCodeObject *code, _PyEval_CacheIndex **ptr)
         }
         else if(opcode == LOAD_METHOD)
             mem->index[i] = j++;
+    }
+    instr = first_instr;
+    for(int i = 0; i < n_opcodes; i++, instr++) {
+        opcode = _Py_OPCODE(*instr);
+        oparg = _Py_OPARG(*instr);
+        if(opcode == STORE_GLOBAL) {
+            if(globals_opt_buffer[oparg] != 0 &&
+                    globals_opt_buffer[oparg] != UINT16_MAX)
+                mem->index[i] = globals_opt_buffer[oparg];
+        }
     }
     *ptr = mem;
     return 0;
@@ -5679,6 +5701,23 @@ load_global_cached_fallback:
             return NULL;
     }
     return value;
+}
+
+Py_LOCAL_INLINE(void) _Py_HOT_FUNCTION
+_PyEval_InlineCacheStoreGlobal(PyCodeObject *code, PyDictObject *globals,
+                               PyObject *v, const unsigned int opcode_offset)
+{
+    _PyEval_CacheIndex *cache_index;
+    _PyEval_CacheEntry *cache;
+    if (GCACHE_IS_DEOPT(code))
+        return;
+    cache_index = code->co_op_cache; 
+    cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
+    if(cache != NULL) {
+        cache->type = CACHE_GLOBALS;
+        cache->data.global.ma_version_tag = globals->ma_version_tag;
+        cache->data.global.obj = v;
+    }
 }
 
 /* A caching version of attribute lookup (LOAD_ATTR).
