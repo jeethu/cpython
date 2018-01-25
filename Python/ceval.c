@@ -5276,7 +5276,6 @@ maybe_dtrace_line(PyFrameObject *frame,
 #define CACHE_ATTRIBUTE_DESCR 4
 #define CACHE_ATTRIBUTE_DESCR_WITH_DICT 5
 #define CACHE_METHOD 6
-#define CACHE_METHOD_ATTR 7
 
 /* Global lookup cache entry */
 
@@ -5720,6 +5719,8 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *co,
                cache->data.global.ma_version_tag == globals->ma_version_tag)
             {
                 INCR_COUNTER(_PyEval_GlobalCacheHits);
+                if(cache->misses > 0)
+                    cache->misses--;
                 return cache->data.global.obj;
             }
             else if (cache->type == CACHE_BUILTINS) {
@@ -5729,6 +5730,8 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *co,
                     ma_version_tag = builtins->ma_version_tag;
                 if (cache->data.global.ma_version_tag == ma_version_tag) {
                     INCR_COUNTER(_PyEval_GlobalCacheHits);
+                    if(cache->misses > 0)
+                        cache->misses--;
                     return cache->data.global.obj;
                 }
             }
@@ -5808,8 +5811,10 @@ _PyEval_InlineCachedGetAttr(PyCodeObject *co, PyTypeObject *type,
                     if (dict && cache->data.attr.ma_version_tag ==
                             dict->ma_version_tag) {
                         attr = cache->data.attr.attr;
-                        Py_INCREF(attr);
                         INCR_COUNTER(_PyEval_AttrCacheHits);
+                        if (_cache->misses > 0)
+                            _cache->misses--;
+                        Py_INCREF(attr);
                         return attr;
                     }
                 }
@@ -5821,8 +5826,14 @@ _PyEval_InlineCachedGetAttr(PyCodeObject *co, PyTypeObject *type,
                         if (f != NULL) {
                             attr = f(descr, owner, (PyObject *)type);
                             Py_DECREF(descr);
+                            INCR_COUNTER(_PyEval_AttrCacheHits);
+                            if (_cache->misses > 0)
+                                _cache->misses--;
                             return attr;
                         }
+                        INCR_COUNTER(_PyEval_AttrCacheHits);
+                        if (_cache->misses > 0)
+                            _cache->misses--;
                         return descr;
                     }
                 }
@@ -5840,8 +5851,14 @@ _PyEval_InlineCachedGetAttr(PyCodeObject *co, PyTypeObject *type,
                             if (f != NULL) {
                                 attr = f(descr, owner, (PyObject *)type);
                                 Py_DECREF(descr);
+                                INCR_COUNTER(_PyEval_AttrCacheHits);
+                                if (_cache->misses > 0)
+                                    _cache->misses--;
                                 return attr;
                             }
+                            INCR_COUNTER(_PyEval_AttrCacheHits);
+                            if (_cache->misses > 0)
+                                _cache->misses--;
                             return descr;
                         }
                         Py_DECREF(descr);
@@ -5963,14 +5980,12 @@ _PyEval_InlineCachedGetMethod(PyCodeObject *co, PyObject *obj,
         if (PyType_HasFeature(tp, Py_TPFLAGS_VALID_VERSION_TAG) &&
                 cache->data.attr.tp_version_tag == tp->tp_version_tag &&
                 ma_version_tag == cache->data.attr.ma_version_tag) {
-            if (cache->type == CACHE_METHOD ||
-                    cache->type == CACHE_METHOD_ATTR) {
+            if (cache->type == CACHE_METHOD) {
                 INCR_COUNTER(_PyEval_MethodCacheHits);
+                if (cache->misses > 0)
+                    cache->misses--;
                 Py_INCREF(cache->data.attr.attr);
                 *method = cache->data.attr.attr;
-                if (cache->type == CACHE_METHOD_ATTR) {
-                    return 0;
-                }
                 return 1;
             }
         }
