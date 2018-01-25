@@ -5478,38 +5478,27 @@ static _Bool _PyEval_InlineCacheMiss(PyCodeObject * const co,
                                      const int opcode_offset,
                                      const uint8_t type)
 {
-    _Bool deoptimize = 0;
-    uint16_t misses = ++cache->misses;
+    uint16_t misses = ++(cache->misses);
 
-    if(type != CACHE_ATTRIBUTE_DICT)
-        cache->type = CACHE_UNITIALIZED;
     if (type == CACHE_GLOBALS && misses == GCACHE_DEOPT_THRESHOLD) {
-        /* If one opcode misses then all other opcodes will also miss
-         * deoptimize all global lookups for the code object.
-         */
-        GCACHE_DEOPT_CODE(co);
-        return 0;
+        if (++(cache_index->globals_deopts) ==
+                cache_index->globals_lookup_sites)
+            GCACHE_DEOPT_CODE(co);
     }
     else if (type == CACHE_ATTRIBUTE_DICT &&
              misses == ACACHE_DEOPT_THRESHOLD) {
-        if (++cache_index->attribute_deopts ==
-            cache_index->attribute_lookup_sites)
-        {
+        if (++(cache_index->attribute_deopts) ==
+                cache_index->attribute_lookup_sites)
             ACACHE_DEOPT_CODE(co);
-        }
     }
     else if (type == CACHE_METHOD &&
              misses == MCACHE_DEOPT_THRESHOLD) {
-        if (++cache_index->method_deopts
-            == cache_index->method_lookup_sites)
-        {
+        if (++(cache_index->method_deopts) ==
+                cache_index->method_lookup_sites)
             MCACHE_DEOPT_CODE(co);
-        }
     }
-    if(deoptimize) {
-        cache_index->index[opcode_offset] = 0;
-        return 0;
-    }
+    if (type != CACHE_ATTRIBUTE_DICT)
+        cache->type = CACHE_UNITIALIZED;
     return 1;
 }
 
@@ -5738,13 +5727,11 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *code,
                     return cache->data.global.obj;
                 }
             }
-            INCR_COUNTER(_PyEval_GlobalCacheMisses);
             populate_cache = _PyEval_InlineCacheMiss(code, cache_index,
                                                      cache, opcode_offset,
                                                      CACHE_GLOBALS);
-        } else {
-            INCR_COUNTER(_PyEval_GlobalCacheMisses);
         }
+        INCR_COUNTER(_PyEval_GlobalCacheMisses);
     }
 load_global_cached_fallback:
     key = PyTuple_GET_ITEM(code->co_names, name_offset);
