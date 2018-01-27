@@ -5201,19 +5201,22 @@ maybe_dtrace_line(PyFrameObject *frame,
 #define GCACHE_OPT_THRESHOLD 200
 
 /* Number of misses, after which to stop caching global variable lookup */
-#define GCACHE_DEOPT_THRESHOLD (GCACHE_OPT_THRESHOLD / 4)
+#define GCACHE_DEOPT_THRESHOLD (GCACHE_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching an attribute lookup */
 #define ACACHE_OPT_THRESHOLD 200
 
 /* Number of misses, after which to stop caching an attribute lookup */
-#define ACACHE_DEOPT_THRESHOLD (ACACHE_OPT_THRESHOLD / 4)
+#define ACACHE_DEOPT_THRESHOLD (ACACHE_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching a method lookup */
 #define MCACHE_OPT_THRESHOLD 200
 
 /* Number of misses, after which to stop caching a method lookup */
-#define MCACHE_DEOPT_THRESHOLD (MCACHE_OPT_THRESHOLD / 4)
+#define MCACHE_DEOPT_THRESHOLD (MCACHE_OPT_THRESHOLD / 2)
+
+/* Number of cache slots for every attr */
+#define ATTR_CACHE_SLOTS 4
 
 #define GCACHE_IS_DEOPT(x) (x->co_op_cache_counters.global_lookups == -1)
 
@@ -5391,8 +5394,7 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
             if (stats[oparg].attr_buf == 0) {
                 stats[oparg].attr_buf = UINT16_MAX;
                 attr_instrs++;
-                /* Two slots for attr lookups */
-                cacheable_ops += 2;
+                cacheable_ops += ATTR_CACHE_SLOTS;
             }
         }
         if (opcode == LOAD_METHOD) {
@@ -5431,9 +5433,9 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
             if (stats[oparg].attr_buf == 0 ||
                     stats[oparg].attr_buf == UINT16_MAX)
             {
-                /* Two slots for attr lookups */
+                /* Multiple slots for attr lookups */
                 stats[oparg].attr_buf = j++;
-                j++;
+                j += (ATTR_CACHE_SLOTS - 1);
             }
             mem->index[i] = stats[oparg].attr_buf;
         }
@@ -5593,34 +5595,41 @@ _PyEval_InlineCacheGlobal(PyCodeObject *co, PyDictObject *globals,
 }
 
 static int
+_PyEval_InlineCacheFindInsertSlot(_PyEval_CacheEntry *cache) {
+    uint64_t max_ma_version_tag = 0;
+    int slot_to_evict = 0;
+
+    for (int i = 0; i < ATTR_CACHE_SLOTS; i++, cache++) {
+        if (max_ma_version_tag == 0 ||
+                cache->data.attr.ma_version_tag > max_ma_version_tag)
+        {
+            max_ma_version_tag = cache->data.attr.ma_version_tag;
+            slot_to_evict = i;
+        }
+        if (cache->type != CACHE_UNITIALIZED) {
+            continue;
+        }
+        return i;
+    }
+    /* All slots are full, evict the newest */
+    return slot_to_evict;
+}
+
+static int
 _PyEval_InlineCacheAttributeDict(PyCodeObject *co, PyTypeObject *type,
                                  PyDictObject* dict, PyObject *attr,
                                  const int opcode_offset)
 {
-    _PyEval_CacheEntry *cache = NULL, *cache1;
+    _PyEval_CacheEntry *cache = NULL;
     int success = _PyEval_InlineCacheAllocateAndLookup(co,
                                                        opcode_offset,
                                                        &cache);
     if (success <= 0)
         return success;
-    if (cache != NULL &&
-            PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG)) {
-        if (cache->type != CACHE_UNITIALIZED) {
-            cache1 = cache + 1;
-            if (cache1->type == CACHE_UNITIALIZED) {
-                cache1->type = CACHE_ATTRIBUTE_DICT;
-                cache1->data.attr.tp_version_tag = type->tp_version_tag;
-                cache1->data.attr.ma_version_tag = dict->ma_version_tag;
-                cache1->data.attr.attr = attr;
-                return 0;
-            } else if (cache->type == CACHE_ATTRIBUTE_DICT &&
-                    cache1->type == CACHE_ATTRIBUTE_DICT)
-            {
-                if (cache->data.attr.ma_version_tag >
-                        cache1->data.attr.ma_version_tag)
-                    cache = cache1;
-            }
-        }
+    if(cache != NULL && PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
+    {
+        int offset = _PyEval_InlineCacheFindInsertSlot(cache);
+        cache += offset;
         cache->type = CACHE_ATTRIBUTE_DICT;
         cache->data.attr.tp_version_tag = type->tp_version_tag;
         cache->data.attr.ma_version_tag = dict->ma_version_tag;
@@ -5634,33 +5643,16 @@ _PyEval_InlineCacheAttributeDescrWithDict(PyCodeObject *co, PyTypeObject *type,
                                           PyObject* descr, PyDictObject *dict,
                                           const int opcode_offset)
 {
-    _PyEval_CacheEntry *cache = NULL, *cache1;
+    _PyEval_CacheEntry *cache = NULL;
     int success = _PyEval_InlineCacheAllocateAndLookup(co,
                                                        opcode_offset,
                                                        &cache);
     if (success <= 0)
         return success;
-    if (cache != NULL &&
-            PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG)) {
-        if (cache->type != CACHE_UNITIALIZED) {
-            cache1 = cache + 1;
-            if (cache1->type == CACHE_UNITIALIZED) {
-                if (dict != NULL) {
-                    cache1->type = CACHE_ATTRIBUTE_DESCR_WITH_DICT;
-                    cache1->data.attr.ma_version_tag = dict->ma_version_tag;
-                } else
-                    cache1->type = CACHE_ATTRIBUTE_DESCR;
-                cache1->data.attr.tp_version_tag = type->tp_version_tag;
-                cache1->data.attr.attr = descr;
-                return 0;
-            } else if (cache->type == CACHE_ATTRIBUTE_DICT &&
-                    cache1->type == CACHE_ATTRIBUTE_DICT)
-            {
-                if (cache->data.attr.tp_version_tag >
-                        cache1->data.attr.tp_version_tag)
-                    cache = cache1;
-            }
-        }
+    if(cache != NULL && PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG))
+    {
+        int offset = _PyEval_InlineCacheFindInsertSlot(cache);
+        cache += offset;
         if (dict != NULL) {
             cache->type = CACHE_ATTRIBUTE_DESCR_WITH_DICT;
             cache->data.attr.ma_version_tag = dict->ma_version_tag;
@@ -5797,7 +5789,7 @@ _PyEval_InlineCacheStoreAttr(PyCodeObject *co, PyObject *owner,
     _cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
     if (_cache != NULL) {
         cache = _cache;
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < ATTR_CACHE_SLOTS; i++) {
             if (cache->type == CACHE_ATTRIBUTE_DICT) {
                 if (cache->data.attr.tp_version_tag == tp->tp_version_tag) {
                     if (dict == NULL)
@@ -5863,8 +5855,8 @@ _PyEval_InlineCachedGetAttr(PyCodeObject *co, PyTypeObject *type,
         }
 
         cache = _cache;
-        /* Lookup in two adjacent slots */
-        for (int i = 0; i < 2; i++) {
+        /* Lookup in multiple adjacent slots */
+        for (int i = 0; i < ATTR_CACHE_SLOTS; i++, cache++) {
             if (cache->data.attr.tp_version_tag == type->tp_version_tag) {
                 if (cache->type == CACHE_ATTRIBUTE_DICT) {
                     if (dict == NULL)
@@ -5926,7 +5918,6 @@ _PyEval_InlineCachedGetAttr(PyCodeObject *co, PyTypeObject *type,
                     }
                 }
             }
-            cache++;    /* Move to the next slot */
         }
 
         /* Cache miss */
