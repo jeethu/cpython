@@ -1517,7 +1517,8 @@ _PyDict_GetItemIdWithError(PyObject *dp, struct _Py_Identifier *key)
  * exist. Return the value if the key exists.
  */
 PyObject *
-_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key)
+_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key,
+                   int * where)
 {
     Py_ssize_t ix;
     Py_hash_t hash;

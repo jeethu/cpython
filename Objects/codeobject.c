@@ -103,6 +103,8 @@ intern_string_constants(PyObject *tuple)
     return modified;
 }
 
+/* Private API */
+Py_ssize_t _PyEval_InlineCacheSize(const PyCodeObject *);
 
 PyCodeObject *
 PyCode_New(int argcount, int kwonlyargcount,
@@ -212,6 +214,8 @@ PyCode_New(int argcount, int kwonlyargcount,
     co->co_zombieframe = NULL;
     co->co_weakreflist = NULL;
     co->co_extra = NULL;
+    co->co_op_cache_counters = (PyCode_OpCache_Counters){0, 0};
+    co->co_op_cache = NULL;
     return co;
 }
 
@@ -452,6 +456,8 @@ code_dealloc(PyCodeObject *co)
         PyObject_GC_Del(co->co_zombieframe);
     if (co->co_weakreflist != NULL)
         PyObject_ClearWeakRefs((PyObject*)co);
+    if (co->co_op_cache != NULL)
+        PyMem_FREE(co->co_op_cache);
     PyObject_DEL(co);
 }
 

@@ -1314,6 +1314,22 @@ In Py_DEBUG mode, also perform some expensive internal consistency\n\
 checks.\n\
 ");
 
+
+static PyObject *
+sys_debuginlinecachestats(PyObject *self, PyObject *args) {
+    if (_PyEval_DebugInlineCacheStats(stderr)) {
+        fputc('\n', stderr);
+    }
+    Py_RETURN_NONE;
+}
+PyDoc_STRVAR(debuginlinecachestats_doc,
+"_debuginlinecachestats()\n\
+\n\
+In Py_DEBUG mode,\n\
+print summary statistics to stderr on the inline cache.\n\
+\n\
+");
+
 #ifdef Py_TRACE_REFS
 /* Defined in objects.c because it uses static globals if that file */
 extern PyObject *_Py_GetObjects(PyObject *, PyObject *);
@@ -1426,6 +1442,8 @@ static PyMethodDef sys_methods[] = {
     {"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
     {"_debugmallocstats", sys_debugmallocstats, METH_NOARGS,
      debugmallocstats_doc},
+    {"_debuginlinecachestats", sys_debuginlinecachestats, METH_NOARGS,
+     debuginlinecachestats_doc},
     {"set_coroutine_wrapper", sys_set_coroutine_wrapper, METH_O,
      set_coroutine_wrapper_doc},
     {"get_coroutine_wrapper", sys_get_coroutine_wrapper, METH_NOARGS,
