@@ -168,7 +168,7 @@ PyAPI_FUNC(int) _PyDict_DelItemId(PyObject *mp, struct _Py_Identifier *key);
 PyAPI_FUNC(void) _PyDict_DebugMallocStats(FILE *out);
 
 int _PyObjectDict_SetItem(PyTypeObject *tp, PyObject **dictptr, PyObject *name, PyObject *value);
-PyObject *_PyDict_LoadGlobal(PyDictObject *, PyDictObject *, PyObject *);
+PyObject *_PyDict_LoadGlobal(PyDictObject *, PyDictObject *, PyObject *, int *);
 #endif
 
 #ifdef __cplusplus
