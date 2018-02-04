@@ -17,6 +17,12 @@ typedef uint16_t _Py_CODEUNIT;
 #  define _Py_OPARG(word) ((word) >> 8)
 #endif
 
+/* Opcode cache packed counters */
+typedef struct {
+    int global_lookups: 16;
+    int attr_lookups: 16;
+} PyCode_OpCache_Counters;
+
 /* Bytecode object */
 typedef struct {
     PyObject_HEAD
@@ -44,10 +50,15 @@ typedef struct {
 				   Objects/lnotab_notes.txt for details. */
     void *co_zombieframe;     /* for optimization only (see frameobject.c) */
     PyObject *co_weakreflist;   /* to support weakrefs to code objects */
+
     /* Scratch space for extra data relating to the code object.
        Type is a void* to keep the format private in codeobject.c to force
        people to go through the proper APIs. */
     void *co_extra;
+
+    PyCode_OpCache_Counters co_op_cache_counters;
+    void *co_op_cache;     /* Structure to hold cached values */
+
 } PyCodeObject;
 
 /* Masks for co_flags above */
