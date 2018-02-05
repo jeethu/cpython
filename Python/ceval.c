@@ -5659,19 +5659,19 @@ maybe_dtrace_line(PyFrameObject *frame,
  */
 
 /* Number of calls, after which to start caching global variable lookups */
-#define GLOBALS_OPT_THRESHOLD 100
+#define GLOBALS_OPT_THRESHOLD 32
 
 /* Number of misses, after which to de-optimize global variable lookup caching */
 #define GLOBALS_DEOPT_THRESHOLD GLOBALS_OPT_THRESHOLD
 
 /* Number of calls, after which to start caching attribute lookups */
-#define ATTRIBUTES_OPT_THRESHOLD 100
+#define ATTRIBUTES_OPT_THRESHOLD 1024
 
 /* Number of misses, after which to de-optimize attribute lookup caching */
 #define ATTRIBUTES_DEOPT_THRESHOLD ATTRIBUTES_OPT_THRESHOLD
 
 /* Number of cache slots for every attr */
-#define ATTRIBUTE_CACHE_SLOTS 4
+#define ATTRIBUTE_CACHE_SLOTS 1
 
 #define GLOBALS_DEOPTIMIZED(x) (x->co_op_cache_counters.global_lookups == -1)
 
