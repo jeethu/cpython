@@ -5769,10 +5769,6 @@ static int _PyEval_AttrCacheMisses = 0;
 #define INCR_COUNTER(x)
 #endif
 
-typedef struct {
-    uint16_t global_buf;
-} _PyEval_OpNameStats;
-
 static int
 _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
 {
@@ -5811,7 +5807,7 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
         oparg = _Py_OPARG(*instr);
         if (opcode == LOAD_GLOBAL) {
             if (global_buf[oparg] == 0) {
-                global_buf[oparg] = UINT16_MAX;
+                global_buf[oparg] = 1;
                 global_instrs++;
                 cacheable_ops++;
             }
@@ -5836,18 +5832,17 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
     mem->attribute_lookup_sites = attr_instrs;
 
     instr = first_instr;
-    for (unsigned int i = 0, j = 1; i < n_opcodes; i++, instr++) {
+    for (unsigned int i = 0, j = 2; i < n_opcodes; i++, instr++) {
         opcode = _Py_OPCODE(*instr);
         oparg = _Py_OPARG(*instr);
         if (opcode == LOAD_GLOBAL) {
-            if (global_buf[oparg] == 0 ||
-                    global_buf[oparg] == UINT16_MAX)
+            if (global_buf[oparg] <= 1)
                 global_buf[oparg] = j++;
-            mem->index[i] = global_buf[oparg];
+            mem->index[i] = global_buf[oparg] - 1;
         }
         else if (opcode == LOAD_ATTR) {
-            mem->index[i] = j++;
-            j += (ATTRIBUTE_CACHE_SLOTS - 1);
+            mem->index[i] = j - 1;
+            j += ATTRIBUTE_CACHE_SLOTS;
         }
     }
     instr = first_instr;
@@ -5855,9 +5850,8 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
         opcode = _Py_OPCODE(*instr);
         oparg = _Py_OPARG(*instr);
         if (opcode == STORE_GLOBAL) {
-            if (global_buf[oparg] > 0 &&
-                    global_buf[oparg] < UINT16_MAX)
-                mem->index[i] = global_buf[oparg];
+            if (global_buf[oparg] > 1)
+                mem->index[i] = global_buf[oparg] - 1;
         }
     }
     *ptr = mem;
