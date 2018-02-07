@@ -47,11 +47,6 @@ static PyObject *
 _PyEval_InlineCachedGetAttr(PyCodeObject *, PyTypeObject *,
                             PyObject *, PyObject *, const int);
 
-/* Forward declaration to support caching in the STORE_ATTR opcode. */
-static void
-_PyEval_InlineCacheStoreAttr(PyCodeObject *, PyObject *, PyObject *,
-                             PyObject *, const unsigned int);
-
 /* Forward declarations */
 static PyObject * call_function(PyObject ***, Py_ssize_t, PyObject *);
 static PyObject * fast_function(PyObject *, PyObject **, Py_ssize_t, PyObject *);
@@ -2331,9 +2326,6 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             int err;
             STACKADJ(-2);
             err = PyObject_SetAttr(owner, name, v);
-            if (err == 0 && co->co_op_cache != NULL)
-                _PyEval_InlineCacheStoreAttr(
-                    co, owner, v, name, OP_INDEX());
             Py_DECREF(v);
             Py_DECREF(owner);
             if (err != 0)
@@ -5779,9 +5771,6 @@ static int _PyEval_AttrCacheMisses = 0;
 
 typedef struct {
     uint16_t global_buf;
-    uint16_t attr_buf;
-    uint16_t last_global_idx;
-    uint16_t last_attr_idx;
 } _PyEval_OpNameStats;
 
 static int
@@ -5795,7 +5784,7 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
     uint16_t global_instrs = 0, attr_instrs = 0;
     int oparg, opcode;
     Py_ssize_t buf_len = PyTuple_GET_SIZE(co->co_names) * sizeof(uint16_t);
-    _PyEval_OpNameStats stats[buf_len];
+    uint16_t global_buf[buf_len];
 
     /*
      * n_opcodes >= INT16_MAX and not UINT16_MAX because we're
@@ -5812,7 +5801,7 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
         return -2;
     }
 
-    memset(stats, 0, buf_len * sizeof(_PyEval_OpNameStats));
+    memset(global_buf, 0, buf_len * sizeof(uint16_t));
 
     first_instr = (_Py_CODEUNIT *)
             PyBytes_AS_STRING(co->co_code);
@@ -5821,18 +5810,15 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
         opcode = _Py_OPCODE(*instr);
         oparg = _Py_OPARG(*instr);
         if (opcode == LOAD_GLOBAL) {
-            if (stats[oparg].global_buf == 0) {
-                stats[oparg].global_buf = UINT16_MAX;
+            if (global_buf[oparg] == 0) {
+                global_buf[oparg] = UINT16_MAX;
                 global_instrs++;
                 cacheable_ops++;
             }
         }
         if (opcode == LOAD_ATTR) {
-            if (stats[oparg].attr_buf == 0) {
-                stats[oparg].attr_buf = UINT16_MAX;
-                attr_instrs++;
-                cacheable_ops += ATTRIBUTE_CACHE_SLOTS;
-            }
+            attr_instrs++;
+            cacheable_ops += ATTRIBUTE_CACHE_SLOTS;
         }
     }
 
@@ -5854,22 +5840,14 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
         opcode = _Py_OPCODE(*instr);
         oparg = _Py_OPARG(*instr);
         if (opcode == LOAD_GLOBAL) {
-            stats[oparg].last_global_idx = i;
-            if (stats[oparg].global_buf == 0 ||
-                    stats[oparg].global_buf == UINT16_MAX)
-                stats[oparg].global_buf = j++;
-            mem->index[i] = stats[oparg].global_buf;
+            if (global_buf[oparg] == 0 ||
+                    global_buf[oparg] == UINT16_MAX)
+                global_buf[oparg] = j++;
+            mem->index[i] = global_buf[oparg];
         }
         else if (opcode == LOAD_ATTR) {
-            stats[oparg].last_attr_idx = i;
-            if (stats[oparg].attr_buf == 0 ||
-                    stats[oparg].attr_buf == UINT16_MAX)
-            {
-                /* Multiple slots for attr lookups */
-                stats[oparg].attr_buf = j++;
-                j += (ATTRIBUTE_CACHE_SLOTS - 1);
-            }
-            mem->index[i] = stats[oparg].attr_buf;
+            mem->index[i] = j++;
+            j += (ATTRIBUTE_CACHE_SLOTS - 1);
         }
     }
     instr = first_instr;
@@ -5877,22 +5855,9 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
         opcode = _Py_OPCODE(*instr);
         oparg = _Py_OPARG(*instr);
         if (opcode == STORE_GLOBAL) {
-            /* It's likely that there are no LOAD_GLOBAL ops after this op */
-            if (stats[oparg].last_global_idx < i) {
-                continue;
-            }
-            if (stats[oparg].global_buf > 0 &&
-                    stats[oparg].global_buf < UINT16_MAX)
-                mem->index[i] = stats[oparg].global_buf;
-        }
-        else if (opcode == STORE_ATTR) {
-            /* It's likely that there are no LOAD_ATTR ops after this op */
-            if (stats[oparg].last_attr_idx < i) {
-                continue;
-            }
-            if (stats[oparg].attr_buf > 0 &&
-                    stats[oparg].attr_buf < UINT16_MAX)
-                mem->index[i] = stats[oparg].attr_buf;
+            if (global_buf[oparg] > 0 &&
+                    global_buf[oparg] < UINT16_MAX)
+                mem->index[i] = global_buf[oparg];
         }
     }
     *ptr = mem;
@@ -6176,51 +6141,6 @@ load_global_cached_fallback:
     return value;
 }
 
-
-static void
-_PyEval_InlineCacheStoreAttr(PyCodeObject *co, PyObject *owner,
-                             PyObject *value, PyObject *name,
-                             const unsigned int opcode_offset)
-{
-    _PyEval_CacheIndex *cache_index;
-    _PyEval_CacheEntry *cache, *_cache;
-    PyDictObject *dict = NULL;
-    PyTypeObject *tp = Py_TYPE(owner);
-    if (!PyType_HasFeature(tp, Py_TPFLAGS_VALID_VERSION_TAG) ||
-            tp->tp_getattro != PyObject_GenericGetAttr)
-        return;
-    if (ATTRIBUTES_DEOPTIMIZED(co))
-        return;
-    cache_index = co->co_op_cache;
-    _cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
-    if (_cache != NULL) {
-        cache = _cache;
-        for (int i = 0; i < ATTRIBUTE_CACHE_SLOTS; i++) {
-            if (cache->type == INLINECACHE_UNINITIALIZED) {
-                if (dict == NULL)
-                    dict = _PyEval_InlineCacheGetDictPtr(owner);
-                if (dict != NULL) {
-                    cache->data.attr.tp_version_tag = tp->tp_version_tag;
-                    cache->data.attr.ma_version_tag = dict->ma_version_tag;
-                    cache->data.attr.attr = value;
-                    return;
-                }
-            }
-            if (cache->type == INLINECACHE_ATTRIBUTE_DICT) {
-                if (cache->data.attr.tp_version_tag == tp->tp_version_tag) {
-                    if (dict == NULL)
-                        dict = _PyEval_InlineCacheGetDictPtr(owner);
-                    if (dict != NULL) {
-                        cache->data.attr.ma_version_tag = dict->ma_version_tag;
-                        cache->data.attr.attr = value;
-                        return;
-                    }
-                }
-            }
-            cache++;    /* Move to the next slot */
-        }
-    }
-}
 
 static void
 _PyEval_InlineCacheStoreGlobal(PyCodeObject *co, PyDictObject *globals,
