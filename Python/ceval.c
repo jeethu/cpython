@@ -5651,16 +5651,16 @@ maybe_dtrace_line(PyFrameObject *frame,
  */
 
 /* Number of calls, after which to start caching global variable lookups */
-#define GLOBALS_OPT_THRESHOLD 32
+#define GLOBALS_OPT_THRESHOLD 992
 
 /* Number of misses, after which to de-optimize global variable lookup caching */
 #define GLOBALS_DEOPT_THRESHOLD GLOBALS_OPT_THRESHOLD
 
 /* Number of calls, after which to start caching attribute lookups */
-#define ATTRIBUTES_OPT_THRESHOLD 1024
+#define ATTRIBUTES_OPT_THRESHOLD 880
 
 /* Number of misses, after which to de-optimize attribute lookup caching */
-#define ATTRIBUTES_DEOPT_THRESHOLD ATTRIBUTES_OPT_THRESHOLD
+#define ATTRIBUTES_DEOPT_THRESHOLD 592
 
 /* Number of cache slots for every attr */
 #define ATTRIBUTE_CACHE_SLOTS 1
@@ -5743,17 +5743,10 @@ typedef struct {
 
 typedef struct {
     uint16_t index_size;  /* In bytes. */
-    /*
-     * n_cache_entries is the number of
-     * _PyEval_CacheEntry objects, not bytes.
-     */
-    uint16_t n_cache_entries;
     uint16_t globals_lookup_sites;
     uint16_t attribute_lookup_sites;
-    uint16_t method_lookup_sites;
     uint16_t globals_deopts;
     uint16_t attribute_deopts;
-    uint16_t method_deopts;
     uint16_t index[];
 } _PyEval_CacheIndex;
 
@@ -5827,7 +5820,6 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
     }
 
     mem->index_size = code_len;
-    mem->n_cache_entries = cacheable_ops;
     mem->globals_lookup_sites = global_instrs;
     mem->attribute_lookup_sites = attr_instrs;
 
@@ -5869,7 +5861,8 @@ Py_ssize_t _PyEval_InlineCacheSize(PyCodeObject * const co) {
         return ((sizeof(_PyEval_CacheIndex)
                  + (Py_ssize_t)cache_index->index_size)
                  + (sizeof(_PyEval_CacheEntry) *
-                   ((Py_ssize_t)cache_index->n_cache_entries)));
+                   (((Py_ssize_t)cache_index->globals_lookup_sites)
+                    + (((Py_ssize_t)cache_index) * ATTRIBUTE_CACHE_SLOTS))));
     }
 }
 
