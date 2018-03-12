@@ -5769,7 +5769,7 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
     Py_ssize_t code_len = PyBytes_GET_SIZE(co->co_code);
     Py_ssize_t n_opcodes =  code_len / sizeof(_Py_CODEUNIT);
     _PyEval_CacheIndex *mem;
-    _Py_CODEUNIT *first_instr, *instr;
+    _Py_CODEUNIT *first_instr, *next_instr;
     uint16_t global_instrs = 0, attr_instrs = 0;
     int oparg, opcode;
     Py_ssize_t buf_len = PyTuple_GET_SIZE(co->co_names) * sizeof(uint16_t);
@@ -5794,10 +5794,17 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
 
     first_instr = (_Py_CODEUNIT *)
             PyBytes_AS_STRING(co->co_code);
-    instr = first_instr;
-    for (unsigned int i=0; i < n_opcodes; i++, instr++) {
-        opcode = _Py_OPCODE(*instr);
-        oparg = _Py_OPARG(*instr);
+    next_instr = first_instr;
+    for (unsigned int i=0; i < n_opcodes; i++, next_instr++) {
+        opcode = _Py_OPCODE(*next_instr);
+        oparg = _Py_OPARG(*next_instr);
+        if (opcode == EXTENDED_ARG) {
+            int oldoparg = oparg;
+            NEXTOPARG();
+            oparg |= oldoparg << 8;
+            if(++i == n_opcodes)
+                break;
+        }
         if (opcode == LOAD_GLOBAL) {
             if (global_buf[oparg] == 0) {
                 global_buf[oparg] = 1;
@@ -5805,7 +5812,7 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
                 cacheable_ops++;
             }
         }
-        if (opcode == LOAD_ATTR) {
+        else if (opcode == LOAD_ATTR) {
             attr_instrs++;
             cacheable_ops += ATTRIBUTE_CACHE_SLOTS;
         }
@@ -5823,10 +5830,17 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
     mem->globals_lookup_sites = global_instrs;
     mem->attribute_lookup_sites = attr_instrs;
 
-    instr = first_instr;
-    for (unsigned int i = 0, j = 2; i < n_opcodes; i++, instr++) {
-        opcode = _Py_OPCODE(*instr);
-        oparg = _Py_OPARG(*instr);
+    next_instr = first_instr;
+    for (unsigned int i = 0, j = 2; i < n_opcodes; i++, next_instr++) {
+        opcode = _Py_OPCODE(*next_instr);
+        oparg = _Py_OPARG(*next_instr);
+        if (opcode == EXTENDED_ARG) {
+            int oldoparg = oparg;
+            NEXTOPARG();
+            oparg |= oldoparg << 8;
+            if(++i == n_opcodes)
+                break;
+        }
         if (opcode == LOAD_GLOBAL) {
             if (global_buf[oparg] <= 1)
                 global_buf[oparg] = j++;
@@ -5837,10 +5851,17 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
             j += ATTRIBUTE_CACHE_SLOTS;
         }
     }
-    instr = first_instr;
-    for (unsigned int i = 0; i < n_opcodes; i++, instr++) {
-        opcode = _Py_OPCODE(*instr);
-        oparg = _Py_OPARG(*instr);
+    next_instr = first_instr;
+    for (unsigned int i = 0; i < n_opcodes; i++, next_instr++) {
+        opcode = _Py_OPCODE(*next_instr);
+        oparg = _Py_OPARG(*next_instr);
+        if (opcode == EXTENDED_ARG) {
+            int oldoparg = oparg;
+            NEXTOPARG();
+            oparg |= oldoparg << 8;
+            if(++i == n_opcodes)
+                break;
+        }
         if (opcode == STORE_GLOBAL) {
             if (global_buf[oparg] > 1)
                 mem->index[i] = global_buf[oparg] - 1;
