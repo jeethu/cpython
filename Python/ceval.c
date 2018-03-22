@@ -5980,15 +5980,18 @@ _PyEval_InlineCacheGlobal(PyCodeObject *co, PyDictObject *globals,
     if (success <= 0)
         return success;
     if (cache != NULL) {
+        uint64_t globals_version = globals->ma_version_tag;
         cache->data.global.obj = value;
-        cache->data.global.ma_version_tag = globals->ma_version_tag;
+        cache->data.global.ma_version_tag = globals_version;
         if (type == INLINECACHE_GLOBALS) {
             cache->type = INLINECACHE_GLOBALS;
         }
         else {
+            uint64_t builtins_version;
             cache->type = INLINECACHE_BUILTINS;
-            if (builtins->ma_version_tag > globals->ma_version_tag)
-                cache->data.global.ma_version_tag = builtins->ma_version_tag;
+            builtins_version = builtins->ma_version_tag;
+            if (builtins_version > globals_version)
+                cache->data.global.ma_version_tag = builtins_version;
         }
     }
     return 0;
@@ -6110,8 +6113,9 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *co,
     if (cache_index != NULL) {
         cache = _PyEval_LookupInlineCacheIndex(cache_index, opcode_offset);
         if (cache != NULL) {
+            ma_version_tag = globals->ma_version_tag;
             if (cache->type == INLINECACHE_GLOBALS &&
-               cache->data.global.ma_version_tag == globals->ma_version_tag)
+               cache->data.global.ma_version_tag == ma_version_tag)
             {
                 INCR_COUNTER(_PyEval_GlobalCacheHits);
                 if (cache->misses > 0)
@@ -6119,10 +6123,10 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *co,
                 return cache->data.global.obj;
             }
             else if (cache->type == INLINECACHE_BUILTINS) {
-                ma_version_tag = globals->ma_version_tag;
+                uint64_t builtins_ma_version_tag = builtins->ma_version_tag;
                 /* This is highly unlikely */
-                if (builtins->ma_version_tag > ma_version_tag)
-                    ma_version_tag = builtins->ma_version_tag;
+                if (builtins_ma_version_tag > ma_version_tag)
+                    ma_version_tag = builtins_ma_version_tag;
                 if (cache->data.global.ma_version_tag == ma_version_tag) {
                     INCR_COUNTER(_PyEval_GlobalCacheHits);
                     if (cache->misses > 0)
