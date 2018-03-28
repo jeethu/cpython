@@ -18,6 +18,7 @@
 #include "pydtrace.h"
 #include "setobject.h"
 #include "structmember.h"
+#include "moduleobject.h"
 
 #include <ctype.h>
 
@@ -42,10 +43,13 @@ static void
 _PyEval_InlineCacheStoreGlobal(PyCodeObject *, PyDictObject *,
                                PyObject *, const unsigned int);
 
-/* Forward declaration to support caching in the LOAD_ATTR opcode. */
+/* Forward declarations to support caching in the LOAD_ATTR opcode. */
 static PyObject *
 _PyEval_InlineCachedGetAttr(PyCodeObject *, PyTypeObject *,
                             PyObject *, PyObject *, const int);
+static PyObject *
+_PyEval_InlineCachedGetModuleAttr(PyCodeObject *, PyTypeObject *,
+                                  PyModuleObject *, PyObject*, const int);
 
 /* Forward declarations */
 static PyObject * call_function(PyObject ***, Py_ssize_t, PyObject *);
@@ -2895,17 +2899,18 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
             PyTypeObject *type = Py_TYPE(owner);
             PyObject *res;
 
-            if (PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG) &&
-                    type->tp_getattro == PyObject_GenericGetAttr) {
-                if (type->tp_dictoffset > 0 && type->tp_dict == NULL) {
-                    if (PyType_Ready(type) < 0) {
-                        Py_DECREF(owner);
-                        SET_TOP(NULL);
-                        goto error;
-                    }
+            if (PyType_HasFeature(type, Py_TPFLAGS_VALID_VERSION_TAG)) {
+                if(type->tp_getattro == PyObject_GenericGetAttr) {
+                    res = _PyEval_InlineCachedGetAttr(co, type, owner,
+                                                      name, OP_INDEX());
                 }
-                res = _PyEval_InlineCachedGetAttr(co, type, owner,
-                                                  name, OP_INDEX());
+                else if(PyModule_CheckExact(owner)) {
+                    res = _PyEval_InlineCachedGetModuleAttr(
+                        co, type, (PyModuleObject *)owner, name, OP_INDEX());
+                }
+                else {
+                    res = PyObject_GetAttr(owner, name);
+                }
             }
             else {
                 res = PyObject_GetAttr(owner, name);
@@ -6173,7 +6178,7 @@ _PyEval_InlineCacheStoreGlobal(PyCodeObject *co, PyDictObject *globals,
 }
 
 /* A caching version of attribute lookup (LOAD_ATTR).
- * Falls back on PyObject_GetAttr
+ * falls back on PyObject_GetAttr
  */
 static PyObject *
 _PyEval_InlineCachedGetAttr(PyCodeObject *co, PyTypeObject *type,
@@ -6341,6 +6346,35 @@ _PyEval_InlineCachedGetAttr(PyCodeObject *co, PyTypeObject *type,
         }
     }
     return PyObject_GetAttr(owner, name);
+}
+
+/* A caching version of module attribute lookup
+ * (module_getattro from Objects/moduleobject.c).
+ * falls back on PyObject_GetAttr
+ */
+static PyObject *
+_PyEval_InlineCachedGetModuleAttr(PyCodeObject *co, PyTypeObject *type,
+                                  PyModuleObject *m, PyObject* name,
+                                  const int opcode_offset)
+{
+    PyObject *attr, *mod_name;
+    attr = _PyEval_InlineCachedGetAttr(co, type, (PyObject*) m,
+                                       name, opcode_offset);
+    if (attr || !PyErr_ExceptionMatches(PyExc_AttributeError))
+        return attr;
+    PyErr_Clear();
+    if (m->md_dict) {
+        _Py_IDENTIFIER(__name__);
+        mod_name = _PyDict_GetItemId(m->md_dict, &PyId___name__);
+        if (mod_name && PyUnicode_Check(mod_name)) {
+            PyErr_Format(PyExc_AttributeError,
+                        "module '%U' has no attribute '%U'", mod_name, name);
+            return NULL;
+        }
+    }
+    PyErr_Format(PyExc_AttributeError,
+                "module has no attribute '%U'", name);
+    return NULL;
 }
 
 #ifdef Py_DEBUG
