@@ -32,6 +32,8 @@
 #undef BYTE
 #include "windows.h"
 
+#include "frozenmodules.h"
+
 extern PyTypeObject PyWindowsConsoleIO_Type;
 #define PyWindowsConsoleIO_Check(op) (PyObject_TypeCheck((op), &PyWindowsConsoleIO_Type))
 #endif
@@ -417,6 +419,8 @@ _Py_InitializeEx_Private(int install_sigs, int install_importlib)
     PySys_SetObject("__stderr__", pstderr);
     Py_DECREF(pstderr);
 
+    _PyFrozenModules_Init();
+
     _PyImport_Init();
 
     _PyImportHooks_Init();
@@ -431,6 +435,8 @@ _Py_InitializeEx_Private(int install_sigs, int install_importlib)
         Py_FatalError("Py_Initialize: can't initialize time");
 
     import_init(interp, sysmod);
+
+
 
     /* initialize the faulthandler module */
     if (_PyFaulthandler_Init())
@@ -555,6 +561,8 @@ Py_FinalizeEx(void)
         return status;
 
     wait_for_thread_shutdown();
+
+    _PyFrozenModules_Finalize();
 
     /* The interpreter is still entirely intact at this point, and the
      * exit funcs may be relying on that.  In particular, if some thread
