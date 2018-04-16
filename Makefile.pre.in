@@ -354,6 +354,7 @@ PYTHON_OBJS=	\
 		Python/structmember.o \
 		Python/symtable.o \
 		Python/sysmodule.o \
+		Python/frozenmodules.o \
 		Python/traceback.o \
 		Python/getopt.o \
 		Python/pystrcmp.o \
@@ -776,6 +777,12 @@ Python/sysmodule.o: $(srcdir)/Python/sysmodule.c Makefile
 		-DABIFLAGS='"$(ABIFLAGS)"' \
 		$(MULTIARCH_CPPFLAGS) \
 		-o $@ $(srcdir)/Python/sysmodule.c
+
+Python/frozenmodules.o: $(srcdir)/Python/frozenmodules.c Makefile
+	$(CC) -c $(PY_CORE_CFLAGS) \
+		-DABIFLAGS='"$(ABIFLAGS)"' \
+		$(MULTIARCH_CPPFLAGS) \
+		-o $@ $(srcdir)/Python/frozenmodules.c
 
 $(IO_OBJS): $(IO_H)
 
