@@ -1530,7 +1530,7 @@ PyImport_ImportModuleLevelObject(PyObject *name, PyObject *globals,
 
     mod = PyDict_GetItem(interp->modules, abs_name);
     if(mod == NULL) {
-        mod = PyFrozenModule_Lookup(abs_name);
+        mod = _PyChilledModule_Lookup(abs_name);
         from_frozen_module = true;
     }
     if (mod != NULL && mod != Py_None) {
