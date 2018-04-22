@@ -255,7 +255,7 @@ import_init(PyInterpreterState *interp, PyObject *sysmod)
     PyObject *value;
 
     /* Import _importlib through its frozen version, _frozen_importlib. */
-    if (PyImport_ImportFrozenModule("_frozen_importlib") <= 0) {
+    if (_PyChilledModules_ImportBootstrap() <= 0) {
         Py_FatalError("Py_Initialize: can't import _frozen_importlib");
     }
     else if (Py_VerboseFlag) {
@@ -419,7 +419,7 @@ _Py_InitializeEx_Private(int install_sigs, int install_importlib)
     PySys_SetObject("__stderr__", pstderr);
     Py_DECREF(pstderr);
 
-    _PyFrozenModules_Init();
+    _PyChilledModules_Init();
 
     _PyImport_Init();
 
@@ -562,7 +562,7 @@ Py_FinalizeEx(void)
 
     wait_for_thread_shutdown();
 
-    _PyFrozenModules_Finalize();
+    _PyChilledModules_Finalize();
 
     /* The interpreter is still entirely intact at this point, and the
      * exit funcs may be relying on that.  In particular, if some thread
