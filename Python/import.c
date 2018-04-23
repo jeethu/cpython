@@ -11,7 +11,7 @@
 #include "frameobject.h"
 #include "osdefs.h"
 #include "importdl.h"
-#include "frozenmodules.h"
+#include "chilledmodules.h"
 
 #include <stdbool.h>
 #ifdef HAVE_FCNTL_H

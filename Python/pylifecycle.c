@@ -16,6 +16,8 @@
 #include "osdefs.h"
 #include <locale.h>
 
+#include "chilledmodules.h"
+
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
@@ -32,7 +34,6 @@
 #undef BYTE
 #include "windows.h"
 
-#include "frozenmodules.h"
 
 extern PyTypeObject PyWindowsConsoleIO_Type;
 #define PyWindowsConsoleIO_Check(op) (PyObject_TypeCheck((op), &PyWindowsConsoleIO_Type))
