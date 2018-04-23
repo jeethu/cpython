@@ -354,7 +354,7 @@ PYTHON_OBJS=	\
 		Python/structmember.o \
 		Python/symtable.o \
 		Python/sysmodule.o \
-		Python/frozenmodules.o \
+		Python/chilledmodules.o \
 		Python/traceback.o \
 		Python/getopt.o \
 		Python/pystrcmp.o \
@@ -778,11 +778,11 @@ Python/sysmodule.o: $(srcdir)/Python/sysmodule.c Makefile
 		$(MULTIARCH_CPPFLAGS) \
 		-o $@ $(srcdir)/Python/sysmodule.c
 
-Python/frozenmodules.o: $(srcdir)/Python/frozenmodules.c $(srcdir)/Python/frozenmodules.h Makefile
+Python/chilledmodules.o: $(srcdir)/Python/chilledmodules.c $(srcdir)/Python/chilledmodules.h Makefile
 	$(CC) -c $(PY_CORE_CFLAGS) \
 		-DABIFLAGS='"$(ABIFLAGS)"' \
 		$(MULTIARCH_CPPFLAGS) \
-		-o $@ $(srcdir)/Python/frozenmodules.c
+		-o $@ $(srcdir)/Python/chilledmodules.c
 
 $(IO_OBJS): $(IO_H)
 
@@ -1016,7 +1016,7 @@ PYTHON_HEADERS= \
 		pyconfig.h \
 		$(PARSER_HEADERS) \
 		$(srcdir)/Include/Python-ast.h \
-		$(srcdir)/Python/frozenmodules.h \
+		$(srcdir)/Python/chilledmodules.h \
 		$(DTRACE_HEADERS)
 
 $(LIBRARY_OBJS) $(MODOBJS) Programs/python.o: $(PYTHON_HEADERS)
