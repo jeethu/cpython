@@ -473,7 +473,7 @@ code_sizeof(PyCodeObject *co, void *unused)
     if (co_extra != NULL)
         res += co_extra->ce_size * sizeof(co_extra->ce_extras[0]);
 
-    return PyLong_FromSsize_t(res);
+    return PyLong_FromSsize_t(res) + _PyEval_InlineCacheSize(co);
 }
 
 static PyObject *

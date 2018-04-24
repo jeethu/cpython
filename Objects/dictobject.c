@@ -1518,7 +1518,7 @@ _PyDict_GetItemIdWithError(PyObject *dp, struct _Py_Identifier *key)
  */
 PyObject *
 _PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key,
-                   int * where)
+                   int *where)
 {
     Py_ssize_t ix;
     Py_hash_t hash;
@@ -1537,12 +1537,16 @@ _PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key,
     if (ix == DKIX_ERROR)
         return NULL;
     if (ix != DKIX_EMPTY && *value_addr != NULL)
+    {
+        *where = 1;
         return *value_addr;
+    }
 
     /* namespace 2: builtins */
     ix = builtins->ma_keys->dk_lookup(builtins, key, hash, &value_addr, NULL);
     if (ix < 0)
         return NULL;
+    *where = 2;
     return *value_addr;
 }
 

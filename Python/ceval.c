@@ -5885,17 +5885,20 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
 
 Py_ssize_t _PyEval_InlineCacheSize(PyCodeObject * const co) {
     _PyEval_CacheIndex *cache_index;
+    Py_ssize_t globals_cache_size, attr_cache_size;
     if (co == NULL)
         return 0;
     cache_index = co->co_op_cache;
     if (cache_index == NULL)
         return 0;
     else {
-        return ((sizeof(_PyEval_CacheIndex)
-                 + (Py_ssize_t)cache_index->index_size)
-                 + (sizeof(_PyEval_CacheEntry) *
-                   (((Py_ssize_t)cache_index->globals_lookup_sites)
-                    + (((Py_ssize_t)cache_index) * IC_ATTR_CACHE_SLOTS))));
+        globals_cache_size = cache_index->globals_lookup_sites * \
+            sizeof(_PyEval_CacheEntry);
+        attr_cache_size = cache_index->attribute_lookup_sites *
+            sizeof(_PyEval_CacheEntry) * IC_ATTR_CACHE_SLOTS;
+
+        return sizeof(_PyEval_CacheIndex) + cache_index->index_size + \
+            globals_cache_size + attr_cache_size;
     }
 }
 
