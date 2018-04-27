@@ -5788,6 +5788,7 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
     int oparg, opcode;
     Py_ssize_t buf_len = PyTuple_GET_SIZE(co->co_names) * sizeof(uint16_t);
     uint16_t global_buf[buf_len];
+    _Bool found_store_global = false;
 
     /*
      * n_opcodes >= INT16_MAX and not UINT16_MAX because we're
@@ -5827,6 +5828,8 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
         }
         else if (opcode == LOAD_ATTR)
             attr_instrs++;
+        else if (opcode == STORE_GLOBAL)
+            found_store_global = true;
     }
 
     mem = (_PyEval_CacheIndex *) PyMem_Calloc(
@@ -5834,6 +5837,10 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
     if (mem == NULL)
         return -1;
 
+    if (global_instrs == 0 && attr_instrs == 0)
+        return 0;
+
+    *ptr = mem;
     mem->index_size = code_len;
     mem->globals_lookup_sites = global_instrs;
     mem->attribute_lookup_sites = attr_instrs;
@@ -5859,6 +5866,10 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
             k += IC_ATTR_CACHE_SLOTS;
         }
     }
+
+    if (global_instrs == 0 || found_store_global == false)
+        return 0;
+
     next_instr = first_instr;
     for (unsigned int i = 0; i < n_opcodes; i++, next_instr++) {
         opcode = _Py_OPCODE(*next_instr);
@@ -5875,7 +5886,6 @@ _PyEval_AllocateInlineCache(PyCodeObject * const co, _PyEval_CacheIndex **ptr)
                 mem->index[i] = global_buf[oparg] - 1;
         }
     }
-    *ptr = mem;
     return 0;
 }
 
@@ -6230,9 +6240,10 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
     if (cache_index != NULL) {
         _cache = _PyEval_LookupInlineAttrCacheIndex(cache_index,
                                                     opcode_offset);
-        if (_cache == NULL)
+        if (_cache == NULL) {
             /* This op has been de-optimized */
             return PyObject_GetAttr(owner, name);
+        }
 
         cache = _cache;
 #if IC_ATTR_CACHE_SLOTS > 1
