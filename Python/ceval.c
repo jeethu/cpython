@@ -5756,12 +5756,15 @@ typedef struct {
 static int _PyEval_GlobalCacheHits = 0;
 static int _PyEval_GlobalCacheMisses = 0;
 
+static int _PyEval_StoreGlobalCacheHits = 0;
+static int _PyEval_StoreGlobalCacheMisses = 0;
+
 static int _PyEval_AttrCacheHits = 0;
 static int _PyEval_AttrCacheMisses = 0;
 
-#define INCR_COUNTER(x) x++
+#define IC_INCR_COUNTER(x) x++
 #else
-#define INCR_COUNTER(x)
+#define IC_INCR_COUNTER(x)
 #endif
 
 static inline Py_ssize_t _calc_inlinecache_size(
@@ -6192,7 +6195,7 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *co,
                 ma_version_tag = globals->ma_version_tag;
                 if (cache->type == IC_GLOBALS &&
                    cache->ma_version_tag == ma_version_tag) {
-                    INCR_COUNTER(_PyEval_GlobalCacheHits);
+                    IC_INCR_COUNTER(_PyEval_GlobalCacheHits);
                     if (cache->misses > 0)
                         cache->misses--;
                     return cache->obj;
@@ -6202,7 +6205,7 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *co,
                     if (builtins_ma_version_tag > ma_version_tag)
                         ma_version_tag = builtins_ma_version_tag;
                     if (cache->ma_version_tag == ma_version_tag) {
-                        INCR_COUNTER(_PyEval_GlobalCacheHits);
+                        IC_INCR_COUNTER(_PyEval_GlobalCacheHits);
                         if (cache->misses > 0)
                             cache->misses--;
                         return cache->obj;
@@ -6210,9 +6213,10 @@ _PyEval_InlineCachedLoadGlobal(PyCodeObject *co,
                 }
                 populate_cache = _PyEval_InlineGlobalCacheMiss(
                     co, cache_index, cache, opcode_offset);
-                INCR_COUNTER(_PyEval_GlobalCacheMisses);
+                IC_INCR_COUNTER(_PyEval_GlobalCacheMisses);
             } else {
                 populate_cache = false;
+                IC_INCR_COUNTER(_PyEval_GlobalCacheMisses);
             }
         }
     }
@@ -6234,16 +6238,18 @@ _PyEval_InlineCacheStoreGlobal(PyCodeObject *co, PyDictObject *globals,
 {
     _PyEval_CacheIndex *cache_index;
     _PyEval_InlineGlobalCacheEntry *cache;
-    if (IC_GLOBALS_DEOPTIMIZED(co))
-        return;
-    cache_index = co->co_op_cache;
-    cache = _PyEval_LookupInlineGlobalCacheIndex(cache_index, opcode_offset);
-    if (cache != NULL) {
-        cache->type = IC_GLOBALS;
-        cache->ma_version_tag = globals->ma_version_tag;
-        cache->obj = v;
-        return;
+    if (!IC_GLOBALS_DEOPTIMIZED(co)) {
+        cache_index = co->co_op_cache;
+        cache = _PyEval_LookupInlineGlobalCacheIndex(cache_index, opcode_offset);
+        if (cache != NULL) {
+            cache->type = IC_GLOBALS;
+            cache->ma_version_tag = globals->ma_version_tag;
+            cache->obj = v;
+            IC_INCR_COUNTER(_PyEval_StoreGlobalCacheHits);
+            return;
+        }
     }
+    IC_INCR_COUNTER(_PyEval_StoreGlobalCacheMisses);
 }
 
 static inline PyObject *
@@ -6261,8 +6267,10 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
 
     if (IC_ATTR_DEOPTIMIZED(co) ||
             co->co_op_cache_counters.attr_lookups < opt_threshold) {
-        if (!IC_ATTR_DEOPTIMIZED(co))
+        if (!IC_ATTR_DEOPTIMIZED(co)) {
             co->co_op_cache_counters.attr_lookups++;
+            IC_INCR_COUNTER(_PyEval_AttrCacheMisses);
+        }
         return PyObject_GetAttr(owner, name);
     }
 
@@ -6272,6 +6280,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
                                                     opcode_offset);
         if (_cache == NULL) {
             /* This op has been de-optimized */
+            IC_INCR_COUNTER(_PyEval_AttrCacheMisses);
             return PyObject_GetAttr(owner, name);
         }
 
@@ -6287,7 +6296,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
                     if (dict && cache->ma_version_tag ==
                             dict->ma_version_tag) {
                         attr = cache->attr;
-                        INCR_COUNTER(_PyEval_AttrCacheHits);
+                        IC_INCR_COUNTER(_PyEval_AttrCacheHits);
                         if (_cache->misses > 0)
                             _cache->misses--;
                         Py_INCREF(attr);
@@ -6302,12 +6311,12 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
                         if (f != NULL) {
                             attr = f(descr, owner, (PyObject *)type);
                             Py_DECREF(descr);
-                            INCR_COUNTER(_PyEval_AttrCacheHits);
+                            IC_INCR_COUNTER(_PyEval_AttrCacheHits);
                             if (_cache->misses > 0)
                                 _cache->misses--;
                             return attr;
                         }
-                        INCR_COUNTER(_PyEval_AttrCacheHits);
+                        IC_INCR_COUNTER(_PyEval_AttrCacheHits);
                         if (_cache->misses > 0)
                             _cache->misses--;
                         return descr;
@@ -6327,12 +6336,12 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
                             if (f != NULL) {
                                 attr = f(descr, owner, (PyObject *)type);
                                 Py_DECREF(descr);
-                                INCR_COUNTER(_PyEval_AttrCacheHits);
+                                IC_INCR_COUNTER(_PyEval_AttrCacheHits);
                                 if (_cache->misses > 0)
                                     _cache->misses--;
                                 return attr;
                             }
-                            INCR_COUNTER(_PyEval_AttrCacheHits);
+                            IC_INCR_COUNTER(_PyEval_AttrCacheHits);
                             if (_cache->misses > 0)
                                 _cache->misses--;
                             return descr;
@@ -6341,7 +6350,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
                     }
                 }
                 else if (cache->type == IC_ATTR_DESCR_F) {
-                    INCR_COUNTER(_PyEval_AttrCacheHits);
+                    IC_INCR_COUNTER(_PyEval_AttrCacheHits);
                     if (_cache->misses > 0)
                         _cache->misses--;
                     return cache->f(cache->attr, owner, (PyObject*)type);
@@ -6351,7 +6360,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
                         dict = _PyEval_InlineCacheGetDictPtr(owner);
                     if (dict != NULL
                             && cache->ma_version_tag == dict->ma_version_tag) {
-                        INCR_COUNTER(_PyEval_AttrCacheHits);
+                        IC_INCR_COUNTER(_PyEval_AttrCacheHits);
                         if (_cache->misses > 0)
                             _cache->misses--;
                         return cache->f(cache->attr, owner, (PyObject*)type);
@@ -6365,7 +6374,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
         /* Cache miss */
         if (!_PyEval_InlineAttrCacheMiss(co, cache_index,
                                          _cache, opcode_offset)) {
-            INCR_COUNTER(_PyEval_AttrCacheMisses);
+            IC_INCR_COUNTER(_PyEval_AttrCacheMisses);
             return PyObject_GetAttr(owner, name);
         }
     }
@@ -6433,8 +6442,10 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject *co, PyTypeObject *type,
     if (cache_index != NULL) {
         cache_index->index[opcode_offset] = 0;
         if (++cache_index->attribute_deopts ==
-                cache_index->attribute_lookup_sites)
+                cache_index->attribute_lookup_sites) {
             IC_DEOPT_ATTR(co);
+            IC_INCR_COUNTER(_PyEval_AttrCacheMisses);
+        }
     }
     return attr;
 }
@@ -6484,6 +6495,8 @@ _PyEval_InlineCachedGetModuleAttr(PyCodeObject *co, PyTypeObject *type,
 
 #ifdef Py_DEBUG
 static float _PyEval_DebugInlineCacheHitRate(int hits, int misses) {
+    if (misses == 0)
+        return 0;
     return (((float)hits) / (hits + misses)) * 100.0;
 }
 #endif
@@ -6494,6 +6507,10 @@ int _PyEval_DebugInlineCacheStats(FILE *f) {
             _PyEval_GlobalCacheHits, _PyEval_GlobalCacheMisses,
             _PyEval_DebugInlineCacheHitRate(
                 _PyEval_GlobalCacheHits, _PyEval_GlobalCacheMisses));
+    fprintf(f, "STORE_GLOBAL: Hits: %d Misses: %d Hit rate: %.4f%%\n",
+            _PyEval_StoreGlobalCacheHits, _PyEval_StoreGlobalCacheMisses,
+            _PyEval_DebugInlineCacheHitRate(
+                _PyEval_StoreGlobalCacheHits, _PyEval_StoreGlobalCacheMisses));
     fprintf(f, "LOAD_ATTR: Hits: %d Misses: %d Hit rate: %.4f%%\n",
             _PyEval_AttrCacheHits, _PyEval_AttrCacheMisses,
             _PyEval_DebugInlineCacheHitRate(
