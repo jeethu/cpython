@@ -104,7 +104,7 @@ intern_string_constants(PyObject *tuple)
 }
 
 /* Private API */
-Py_ssize_t _PyEval_InlineCacheSize(const PyCodeObject *);
+Py_ssize_t _PyEval_InlineCacheSize(const PyCodeObject * const);
 
 PyCodeObject *
 PyCode_New(int argcount, int kwonlyargcount,

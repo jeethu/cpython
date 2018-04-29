@@ -1509,7 +1509,7 @@ _PyDict_GetItemIdWithError(PyObject *dp, struct _Py_Identifier *key)
     return PyDict_GetItemWithError(dp, kv);
 }
 
-/* Fast version of global value lookup (LOAD_GLOBAL).
+/* Fast versions of global value lookup (LOAD_GLOBAL).
  * Lookup in globals, then builtins.
  *
  * Raise an exception and return NULL if an error occurred (ex: computing the
@@ -1517,8 +1517,10 @@ _PyDict_GetItemIdWithError(PyObject *dp, struct _Py_Identifier *key)
  * exist. Return the value if the key exists.
  */
 PyObject *
-_PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key,
-                   int *where)
+_PyDict_LoadGlobalEx(PyDictObject *globals,
+                     PyDictObject *builtins,
+                     PyObject *key,
+                     int * const where)
 {
     Py_ssize_t ix;
     Py_hash_t hash;
@@ -1547,6 +1549,37 @@ _PyDict_LoadGlobal(PyDictObject *globals, PyDictObject *builtins, PyObject *key,
     if (ix < 0)
         return NULL;
     *where = 2;
+    return *value_addr;
+}
+
+PyObject *
+_PyDict_LoadGlobal(PyDictObject *globals,
+                   PyDictObject *builtins,
+                   PyObject *key)
+{
+    Py_ssize_t ix;
+    Py_hash_t hash;
+    PyObject **value_addr;
+
+    if (!PyUnicode_CheckExact(key) ||
+        (hash = ((PyASCIIObject *) key)->hash) == -1)
+    {
+        hash = PyObject_Hash(key);
+        if (hash == -1)
+            return NULL;
+    }
+
+    /* namespace 1: globals */
+    ix = globals->ma_keys->dk_lookup(globals, key, hash, &value_addr, NULL);
+    if (ix == DKIX_ERROR)
+        return NULL;
+    if (ix != DKIX_EMPTY && *value_addr != NULL)
+        return *value_addr;
+
+    /* namespace 2: builtins */
+    ix = builtins->ma_keys->dk_lookup(builtins, key, hash, &value_addr, NULL);
+    if (ix < 0)
+        return NULL;
     return *value_addr;
 }
 
