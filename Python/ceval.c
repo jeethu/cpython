@@ -5678,25 +5678,25 @@ maybe_dtrace_line(PyFrameObject *frame,
 #define IC_GLOBALS_OPT_THRESHOLD 32
 
 /* Number of misses, after which to de-optimize global variable lookup caching */
-#define IC_GLOBALS_DEOPT_THRESHOLD 32
+#define IC_GLOBALS_DEOPT_THRESHOLD (IC_GLOBALS_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching attribute lookups */
 #define IC_ATTR_OPT_THRESHOLD 304
 
 /* Number of misses, after which to de-optimize attribute lookup caching */
-#define IC_ATTR_DEOPT_THRESHOLD 48
+#define IC_ATTR_DEOPT_THRESHOLD (IC_ATTR_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching module attribute lookups */
 #define IC_MODULE_ATTR_OPT_THRESHOLD 48
 
 /* Number of misses, after which to de-optimize module attribute lookup caching */
-#define IC_MODULE_ATTR_DEOPT_THRESHOLD 48
+#define IC_MODULE_ATTR_DEOPT_THRESHOLD (IC_MODULE_ATTR_OPT_THRESHOLD / 2)
 
 /* Number of calls, after which to start caching type attribute lookups */
 #define IC_TP_ATTR_OPT_THRESHOLD 32
 
 /* Number of misses, after which to de-optimize module attribute lookup caching */
-#define IC_TP_ATTR_DEOPT_THRESHOLD 8
+#define IC_TP_ATTR_DEOPT_THRESHOLD (IC_TP_ATTR_OPT_THRESHOLD / 2)
 
 /* Macro to de-optimize global lookup caching for the whole code object */
 
