@@ -5678,25 +5678,25 @@ maybe_dtrace_line(PyFrameObject *frame,
 #define IC_GLOBALS_OPT_THRESHOLD 32
 
 /* Number of misses, after which to de-optimize global variable lookup caching */
-#define IC_GLOBALS_DEOPT_THRESHOLD 16
+#define IC_GLOBALS_DEOPT_THRESHOLD 32
 
 /* Number of calls, after which to start caching attribute lookups */
 #define IC_ATTR_OPT_THRESHOLD 304
 
 /* Number of misses, after which to de-optimize attribute lookup caching */
-#define IC_ATTR_DEOPT_THRESHOLD 152
+#define IC_ATTR_DEOPT_THRESHOLD 48
 
 /* Number of calls, after which to start caching module attribute lookups */
-#define IC_MODULE_ATTR_OPT_THRESHOLD 64
+#define IC_MODULE_ATTR_OPT_THRESHOLD 48
 
 /* Number of misses, after which to de-optimize module attribute lookup caching */
-#define IC_MODULE_ATTR_DEOPT_THRESHOLD 32
+#define IC_MODULE_ATTR_DEOPT_THRESHOLD 48
 
 /* Number of calls, after which to start caching type attribute lookups */
 #define IC_TP_ATTR_OPT_THRESHOLD 32
 
 /* Number of misses, after which to de-optimize module attribute lookup caching */
-#define IC_TP_ATTR_DEOPT_THRESHOLD 16
+#define IC_TP_ATTR_DEOPT_THRESHOLD 8
 
 /* Macro to de-optimize global lookup caching for the whole code object */
 
@@ -6270,28 +6270,26 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
     PyObject *name, *attr, *descr = NULL;
     descrgetfunc f = NULL;
     PyDictObject *dict = NULL;
-    _PyEval_InlineAttrCacheEntry *cache, *_cache;
+    _PyEval_InlineAttrCacheEntry *cache;
     _PyEval_CacheIndex *cache_index;
-    _Bool populate_cache = true;
 
     if (co->co_op_cache_counters.attr_lookups < opt_threshold) {
         co->co_op_cache_counters.attr_lookups++;
-        populate_cache = false;
+        return PyObject_GetAttr(owner,
+                                GETITEM(co->co_names, name_offset));
     }
-    else
-        populate_cache = true;
 
     cache_index = co->co_op_cache;
     if (cache_index != NULL) {
-        _cache = _PyEval_LookupInlineAttrCacheIndex(co, cache_index,
+        cache = _PyEval_LookupInlineAttrCacheIndex(co, cache_index,
                                                     opcode_offset);
-        if (_cache == NULL) {
+        if (cache == NULL) {
             /* This op has been de-optimized */
             IC_INCR_COUNTER(_PyEval_AttrCacheMisses);
-            populate_cache = false;
+            return PyObject_GetAttr(owner,
+                                    GETITEM(co->co_names, name_offset));
         }
         else {
-            cache = _cache;
             if (cache->tp_version_tag == type->tp_version_tag) {
                 if (dict == NULL)
                     dict = _PyEval_InlineCacheGetDictPtr(type, owner);
@@ -6300,8 +6298,8 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
                             dict->ma_version_tag) {
                         attr = cache->attr;
                         IC_INCR_COUNTER(_PyEval_AttrCacheHits);
-                        if (_cache->misses > 0)
-                            _cache->misses--;
+                        if (cache->misses > 0)
+                            cache->misses--;
                         Py_INCREF(attr);
                         return attr;
                     }
@@ -6315,13 +6313,13 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
                             attr = f(descr, owner, (PyObject *)type);
                             Py_DECREF(descr);
                             IC_INCR_COUNTER(_PyEval_AttrCacheHits);
-                            if (_cache->misses > 0)
-                                _cache->misses--;
+                            if (cache->misses > 0)
+                                cache->misses--;
                             return attr;
                         }
                         IC_INCR_COUNTER(_PyEval_AttrCacheHits);
-                        if (_cache->misses > 0)
-                            _cache->misses--;
+                        if (cache->misses > 0)
+                            cache->misses--;
                         return descr;
                     }
                 }
@@ -6338,13 +6336,13 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
                                 attr = f(descr, owner, (PyObject *)type);
                                 Py_DECREF(descr);
                                 IC_INCR_COUNTER(_PyEval_AttrCacheHits);
-                                if (_cache->misses > 0)
-                                    _cache->misses--;
+                                if (cache->misses > 0)
+                                    cache->misses--;
                                 return attr;
                             }
                             IC_INCR_COUNTER(_PyEval_AttrCacheHits);
-                            if (_cache->misses > 0)
-                                _cache->misses--;
+                            if (cache->misses > 0)
+                                cache->misses--;
                             return descr;
                         }
                         Py_DECREF(descr);
@@ -6352,8 +6350,8 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
                 }
                 else if (cache->type == IC_ATTR_DESCR_F) {
                     IC_INCR_COUNTER(_PyEval_AttrCacheHits);
-                    if (_cache->misses > 0)
-                        _cache->misses--;
+                    if (cache->misses > 0)
+                        cache->misses--;
                     descr = cache->attr;
                     f = descr->ob_type->tp_descr_get;
                     return f(descr, owner, (PyObject*)type);
@@ -6362,8 +6360,8 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
                     if (dict != NULL
                             && cache->ma_version_tag == dict->ma_version_tag) {
                         IC_INCR_COUNTER(_PyEval_AttrCacheHits);
-                        if (_cache->misses > 0)
-                            _cache->misses--;
+                        if (cache->misses > 0)
+                            cache->misses--;
                         descr = cache->attr;
                         f = descr->ob_type->tp_descr_get;
                         return f(descr, owner, (PyObject*)type);
@@ -6373,9 +6371,10 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
 
             /* Cache miss */
             if (!_PyEval_InlineAttrCacheMiss(co, cache_index,
-                                             _cache, opcode_offset)) {
+                                             cache, opcode_offset)) {
                 IC_INCR_COUNTER(_PyEval_AttrCacheMisses);
-                populate_cache = false;
+                return PyObject_GetAttr(owner,
+                                        GETITEM(co->co_names, name_offset));
             }
         }
     }
@@ -6387,7 +6386,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
         f = descr->ob_type->tp_descr_get;
         if (f != NULL && PyDescr_IsData(descr)) {
             attr = f(descr, owner, (PyObject *)type);
-            if (populate_cache && attr != NULL && _PyEval_InlineCacheAttributeDescr(
+            if (attr != NULL && _PyEval_InlineCacheAttributeDescr(
                     co, type, descr, NULL, IC_ATTR_DESCR, opcode_offset) == -1) {
                 Py_DECREF(attr);
                 Py_DECREF(descr);
@@ -6402,7 +6401,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
     if (dict != NULL) {
         attr = PyDict_GetItem((PyObject *)dict, name);
         if (attr != NULL) {
-            if (populate_cache && _PyEval_InlineCacheAttributeDict(co, type, dict,
+            if (_PyEval_InlineCacheAttributeDict(co, type, dict,
                     attr, opcode_offset) == -1) {
                 Py_XDECREF(descr);
                 return NULL;
@@ -6414,7 +6413,7 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
     }
     if (f != NULL) {
         attr = f(descr, owner, (PyObject *)type);
-        if (populate_cache && attr != NULL && _PyEval_InlineCacheAttributeDescr(
+        if (attr != NULL && _PyEval_InlineCacheAttributeDescr(
                 co, type, descr, dict, IC_ATTR_DESCR_F, opcode_offset) == -1) {
             Py_DECREF(attr);
             Py_DECREF(descr);
@@ -6434,17 +6433,12 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
                 IC_DEOPT_ATTR(co);
         }
         return descr;
-    } else {
+    }
+    else {
         PyErr_Format(PyExc_AttributeError,
                      "'%.50s' object has no attribute '%U'",
                      type->tp_name, name);
-        attr = NULL;
-    }
-
-    Py_XDECREF(descr);
-
-    if (populate_cache || attr == NULL) {
-        /* Dynamic value, de-optimize */
+        /* Error, de-optimize */
         IC_INCR_COUNTER(_PyEval_AttrCacheMisses);
         if (cache_index != NULL) {
             cache_index->index[opcode_offset] = 0;
@@ -6453,8 +6447,9 @@ _PyEval_InlineCachedGetAttrEx(PyCodeObject * const co,
                 IC_DEOPT_ATTR(co);
             }
         }
+        Py_XDECREF(descr);
+        return NULL;
     }
-    return attr;
 }
 
 /* A caching version of attribute lookup (LOAD_ATTR).
