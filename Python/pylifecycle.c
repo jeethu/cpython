@@ -795,6 +795,8 @@ Py_NewInterpreter(void)
 
     save_tstate = PyThreadState_Swap(tstate);
 
+    _PyChilledModules_Disable();
+
     /* XXX The following is lax in error checking */
 
     interp->modules = PyDict_New();
@@ -845,11 +847,15 @@ Py_NewInterpreter(void)
             initsite();
     }
 
-    if (!PyErr_Occurred())
+    if (!PyErr_Occurred()) {
+        _PyChilledModules_Enable();
         return tstate;
+    }
 
 handle_error:
     /* Oops, it didn't work.  Undo it all. */
+
+    _PyChilledModules_Enable();
 
     PyErr_PrintEx(0);
     PyThreadState_Clear(tstate);
