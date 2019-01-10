@@ -640,7 +640,7 @@ static PyObject *
 clone_combined_dict(PyDictObject *orig)
 {
     assert(PyDict_CheckExact(orig));
-    assert(orig->ma_values == NULL);
+    assert(!_PyDict_HasSplitTable(orig));
     assert(orig->ma_keys->dk_refcnt == 1);
 
     Py_ssize_t keys_size = _PyDict_KeysSize(orig->ma_keys);
@@ -803,7 +803,7 @@ static Py_ssize_t _Py_HOT_FUNCTION
 lookdict_unicode(PyDictObject *mp, PyObject *key,
                  Py_hash_t hash, PyObject **value_addr)
 {
-    assert(mp->ma_values == NULL);
+    assert(!_PyDict_HasSplitTable(mp));
     /* Make sure this function doesn't have to handle non-unicode keys,
        including subclasses of str; e.g., one reason to subclass
        unicodes is to override __eq__, and for speed we don't cater to
@@ -846,7 +846,7 @@ static Py_ssize_t _Py_HOT_FUNCTION
 lookdict_unicode_nodummy(PyDictObject *mp, PyObject *key,
                          Py_hash_t hash, PyObject **value_addr)
 {
-    assert(mp->ma_values == NULL);
+    assert(!_PyDict_HasSplitTable(mp));
     /* Make sure this function doesn't have to handle non-unicode keys,
        including subclasses of str; e.g., one reason to subclass
        unicodes is to override __eq__, and for speed we don't cater to
@@ -892,7 +892,7 @@ lookdict_split(PyDictObject *mp, PyObject *key,
                Py_hash_t hash, PyObject **value_addr)
 {
     /* mp must split table */
-    assert(mp->ma_values != NULL);
+    assert(_PyDict_HasSplitTable(mp));
     if (!PyUnicode_CheckExact(key)) {
         Py_ssize_t ix = lookdict(mp, key, hash, value_addr);
         if (ix >= 0) {
@@ -1027,7 +1027,7 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value)
 
     Py_INCREF(key);
     Py_INCREF(value);
-    if (mp->ma_values != NULL && !PyUnicode_CheckExact(key)) {
+    if (_PyDict_HasSplitTable(mp) && !PyUnicode_CheckExact(key)) {
         if (insertion_resize(mp) < 0)
             goto Fail;
     }
@@ -1063,7 +1063,7 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value)
         dictkeys_set_index(mp->ma_keys, hashpos, mp->ma_keys->dk_nentries);
         ep->me_key = key;
         ep->me_hash = hash;
-        if (mp->ma_values) {
+        if (_PyDict_HasSplitTable(mp)) {
             assert (mp->ma_values[mp->ma_keys->dk_nentries] == NULL);
             mp->ma_values[mp->ma_keys->dk_nentries] = value;
         }
@@ -2107,7 +2107,7 @@ dict_keys(PyDictObject *mp)
     }
     ep = DK_ENTRIES(mp->ma_keys);
     size = mp->ma_keys->dk_nentries;
-    if (mp->ma_values) {
+    if (_PyDict_HasSplitTable(mp)) {
         value_ptr = mp->ma_values;
         offset = sizeof(PyObject *);
     }
@@ -2151,7 +2151,7 @@ dict_values(PyDictObject *mp)
     }
     ep = DK_ENTRIES(mp->ma_keys);
     size = mp->ma_keys->dk_nentries;
-    if (mp->ma_values) {
+    if (_PyDict_HasSplitTable(mp)) {
         value_ptr = mp->ma_values;
         offset = sizeof(PyObject *);
     }
@@ -2209,7 +2209,7 @@ dict_items(PyDictObject *mp)
     /* Nothing we do below makes any function calls. */
     ep = DK_ENTRIES(mp->ma_keys);
     size = mp->ma_keys->dk_nentries;
-    if (mp->ma_values) {
+    if (_PyDict_HasSplitTable(mp)) {
         value_ptr = mp->ma_values;
         offset = sizeof(PyObject *);
     }
@@ -2430,7 +2430,7 @@ dict_merge(PyObject *a, PyObject *b, int override)
             entry = &ep0[i];
             key = entry->me_key;
             hash = entry->me_hash;
-            if (other->ma_values)
+            if (_PyDict_HasSplitTable(other))
                 value = other->ma_values[i];
             else
                 value = entry->me_value;
@@ -2592,7 +2592,7 @@ PyDict_Copy(PyObject *o)
         return (PyObject *)split_copy;
     }
 
-    if (PyDict_CheckExact(mp) && mp->ma_values == NULL &&
+    if (PyDict_CheckExact(mp) && !_PyDict_HasSplitTable(mp) &&
             (mp->ma_used >= (mp->ma_keys->dk_nentries * 2) / 3))
     {
         /* Use fast-copy if:
@@ -2677,7 +2677,7 @@ dict_equal(PyDictObject *a, PyDictObject *b)
     for (i = 0; i < a->ma_keys->dk_nentries; i++) {
         PyDictKeyEntry *ep = &DK_ENTRIES(a->ma_keys)[i];
         PyObject *aval;
-        if (a->ma_values)
+        if (_PyDict_HasSplitTable(a))
             aval = a->ma_values[i];
         else
             aval = ep->me_value;
@@ -2817,7 +2817,7 @@ PyDict_SetDefault(PyObject *d, PyObject *key, PyObject *defaultobj)
             return NULL;
     }
 
-    if (mp->ma_values != NULL && !PyUnicode_CheckExact(key)) {
+    if (_PyDict_HasSplitTable(mp) && !PyUnicode_CheckExact(key)) {
         if (insertion_resize(mp) < 0)
             return NULL;
     }
@@ -2999,7 +2999,7 @@ dict_traverse(PyObject *op, visitproc visit, void *arg)
         }
     }
     else {
-        if (mp->ma_values != NULL) {
+        if (_PyDict_HasSplitTable(mp)) {
             for (i = 0; i < n; i++) {
                 Py_VISIT(mp->ma_values[i]);
             }
@@ -3031,7 +3031,7 @@ _PyDict_SizeOf(PyDictObject *mp)
     usable = USABLE_FRACTION(size);
 
     res = _PyObject_SIZE(Py_TYPE(mp));
-    if (mp->ma_values)
+    if (_PyDict_HasSplitTable(mp))
         res += usable * sizeof(PyObject*);
     /* If the dictionary is split, the keys portion is accounted-for
        in the type object. */
@@ -3449,7 +3449,7 @@ dictiter_iternextkey(dictiterobject *di)
     i = di->di_pos;
     k = d->ma_keys;
     assert(i >= 0);
-    if (d->ma_values) {
+    if (_PyDict_HasSplitTable(d)) {
         if (i >= d->ma_used)
             goto fail;
         key = DK_ENTRIES(k)[i].me_key;
@@ -3530,7 +3530,7 @@ dictiter_iternextvalue(dictiterobject *di)
 
     i = di->di_pos;
     assert(i >= 0);
-    if (d->ma_values) {
+    if (_PyDict_HasSplitTable(d)) {
         if (i >= d->ma_used)
             goto fail;
         value = d->ma_values[i];
@@ -3611,7 +3611,7 @@ dictiter_iternextitem(dictiterobject *di)
 
     i = di->di_pos;
     assert(i >= 0);
-    if (d->ma_values) {
+    if (_PyDict_HasSplitTable(d)) {
         if (i >= d->ma_used)
             goto fail;
         key = DK_ENTRIES(d->ma_keys)[i].me_key;
@@ -3716,7 +3716,7 @@ dictreviter_iternext(dictiterobject *di)
     PyDictKeysObject *k = d->ma_keys;
     PyObject *key, *value, *result;
 
-    if (d->ma_values) {
+    if (_PyDict_HasSplitTable(d)) {
         if (i < 0) {
             goto fail;
         }
