@@ -5,8 +5,14 @@ typedef struct {
     /* Cached hash code of me_key. */
     Py_hash_t me_hash;
     PyObject *me_key;
-    PyObject *me_value; /* This field is only meaningful for combined tables */
 } PyDictKeyEntry;
+
+typedef struct {
+    /* Cached hash code of me_key. */
+    Py_hash_t me_hash;
+    PyObject *me_key;
+    PyObject *me_value;
+} PyDictKeyCombinedEntry;
 
 /* dict_lookup_func() returns index of entry which can be used like DK_ENTRIES(dk)[index].
  * -1 when no entry found, -3 when compare raises error.
