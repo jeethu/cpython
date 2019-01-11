@@ -1146,13 +1146,13 @@ class SizeofTest(unittest.TestCase):
                   '4P')
         class newstyleclass(object): pass
         # Separate block for PyDictKeysObject with 8 keys and 5 entries
-        check(newstyleclass, s + calcsize("2nP2n0P") + 8 + 5*calcsize("n2P"))
+        check(newstyleclass, s + calcsize("2nP2n0P") + 8 + 5*calcsize("nP"))
         # dict with shared keys
         check(newstyleclass().__dict__, size('nQ2P') + 5*self.P)
         o = newstyleclass()
         o.a = o.b = o.c = o.d = o.e = o.f = o.g = o.h = 1
         # Separate block for PyDictKeysObject with 16 keys and 10 entries
-        check(newstyleclass, s + calcsize("2nP2n0P") + 16 + 10*calcsize("n2P"))
+        check(newstyleclass, s + calcsize("2nP2n0P") + 16 + 10*calcsize("nP"))
         # dict with shared keys
         check(newstyleclass().__dict__, size('nQ2P') + 10*self.P)
         # unicode
