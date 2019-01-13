@@ -544,6 +544,22 @@ _PyDict_CheckConsistency(PyDictObject *mp)
 }
 #endif
 
+
+static inline Py_ssize_t get_es(Py_ssize_t size) {
+    if (size <= 0xff) {
+        return 1;
+    }
+    else if (size <= 0xffff) {
+        return 2;
+    }
+#if SIZEOF_VOID_P > 4
+    else if (size <= 0xffffffff) {
+        return 4;
+    }
+#endif
+    return sizeof(Py_ssize_t);
+}
+
 static inline PyDictKeysObject *new_keys_object_common(Py_ssize_t size, bool split) {
     PyDictKeysObject *dk = NULL;
     Py_ssize_t es, usable;
@@ -552,20 +568,6 @@ static inline PyDictKeysObject *new_keys_object_common(Py_ssize_t size, bool spl
     assert(IS_POWER_OF_2(size));
 
     usable = USABLE_FRACTION(size);
-    if (size <= 0xff) {
-        es = 1;
-    }
-    else if (size <= 0xffff) {
-        es = 2;
-    }
-#if SIZEOF_VOID_P > 4
-    else if (size <= 0xffffffff) {
-        es = 4;
-    }
-#endif
-    else {
-        es = sizeof(Py_ssize_t);
-    }
 
     if(size == PyDict_MINSIZE) {
         if(split && numfreekeys > 0) {
@@ -575,6 +577,8 @@ static inline PyDictKeysObject *new_keys_object_common(Py_ssize_t size, bool spl
             dk = combined_keys_free_list[--numcombinedfreekeys];
         }
     }
+
+    es = get_es(size);
 
     if (dk == NULL) {
         dk = PyObject_MALLOC(sizeof(PyDictKeysObject)
@@ -1294,7 +1298,7 @@ dictresize(PyDictObject *mp, Py_ssize_t minsize)
 static PyDictKeysObject *
 make_keys_shared(PyObject *op)
 {
-    Py_ssize_t es, i, size, usable;
+    Py_ssize_t i, size, usable;
     PyDictObject *mp = (PyDictObject *)op;
 
     if (!PyDict_CheckExact(op))
@@ -1307,20 +1311,6 @@ make_keys_shared(PyObject *op)
         PyObject **values;
         assert(oldkeys->dk_refcnt == 1);
         size = DK_SIZE(oldkeys);
-        if (size <= 0xff) {
-            es = 1;
-        }
-        else if (size <= 0xffff) {
-            es = 2;
-        }
-#if SIZEOF_VOID_P > 4
-        else if (size <= 0xffffffff) {
-            es = 4;
-        }
-#endif
-        else {
-            es = sizeof(Py_ssize_t);
-        }
         if (oldkeys->dk_lookup == lookdict) {
             return NULL;
         }
@@ -1349,7 +1339,7 @@ make_keys_shared(PyObject *op)
         newkeys->dk_usable = oldkeys->dk_usable;
         newkeys->dk_nentries = oldkeys->dk_nentries;
         memcpy(&newkeys->dk_indices[0], &oldkeys->dk_indices[0],
-                es * size);
+                get_es(size) * size);
         ep1 = DK_ENTRIES(newkeys);
         for(i = 0; i < usable; i++) {
             ep1[i].me_hash = ep0[i].me_hash;
