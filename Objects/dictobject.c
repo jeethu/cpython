@@ -546,7 +546,7 @@ _PyDict_CheckConsistency(PyDictObject *mp)
 
 static inline PyDictKeysObject *new_keys_object_common(Py_ssize_t size, bool split) {
     PyDictKeysObject *dk = NULL;
-    Py_ssize_t es, usable, key_enty_size;
+    Py_ssize_t es, usable;
 
     assert(size >= PyDict_MINSIZE);
     assert(IS_POWER_OF_2(size));
@@ -567,8 +567,6 @@ static inline PyDictKeysObject *new_keys_object_common(Py_ssize_t size, bool spl
         es = sizeof(Py_ssize_t);
     }
 
-    key_enty_size = split ? sizeof(PyDictKeyEntry) : sizeof(PyDictKeyCombinedEntry);
-
     if(size == PyDict_MINSIZE) {
         if(split && numfreekeys > 0) {
             dk = keys_free_list[--numfreekeys];
@@ -581,7 +579,8 @@ static inline PyDictKeysObject *new_keys_object_common(Py_ssize_t size, bool spl
     if (dk == NULL) {
         dk = PyObject_MALLOC(sizeof(PyDictKeysObject)
                              + es * size
-                             + key_enty_size * usable);
+                             + (split ?
+                                 sizeof(PyDictKeyEntry) : sizeof(PyDictKeyCombinedEntry)) * usable);
         if (dk == NULL) {
             PyErr_NoMemory();
             return NULL;
@@ -1120,8 +1119,8 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value)
         Py_ssize_t hashpos = find_empty_slot(mp->ma_keys, hash);
         dictkeys_set_index(mp->ma_keys, hashpos, mp->ma_keys->dk_nentries);
         if (_PyDict_HasSplitTable(mp)) {
-            PyDictKeyEntry *ep;
-            ep = &DK_ENTRIES(mp->ma_keys)[mp->ma_keys->dk_nentries];
+            PyDictKeyEntry *ep =
+                    &DK_ENTRIES(mp->ma_keys)[mp->ma_keys->dk_nentries];
             ep->me_key = key;
             ep->me_hash = hash;
             assert (mp->ma_values[mp->ma_keys->dk_nentries] == NULL);
