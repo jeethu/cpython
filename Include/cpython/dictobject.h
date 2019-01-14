@@ -62,6 +62,7 @@ PyObject *_PyDict_FromKeys(PyObject *, PyObject *, PyObject *);
 #define _PyDict_HasSplitTable(d) ((d)->ma_values != NULL)
 
 PyAPI_FUNC(int) PyDict_ClearFreeList(void);
+PyAPI_FUNC(uint64_t) _PyDict_GetVersion(PyObject *mp);
 
 /* Like PyDict_Merge, but override can be 0, 1 or 2.  If override is 0,
    the first occurrence of a key wins, if override is 1, the last occurrence

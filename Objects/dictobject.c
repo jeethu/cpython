@@ -611,7 +611,7 @@ new_dict(PyDictKeysObject *keys, PyObject **values)
     mp->ma_keys = keys;
     mp->ma_values = values;
     mp->ma_used = 0;
-    mp->ma_version_tag = DICT_NEXT_VERSION();
+    mp->ma_version_tag = 0;
     assert(_PyDict_CheckConsistency(mp));
     return (PyObject *)mp;
 }
@@ -1071,7 +1071,8 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value)
             ep->me_value = value;
         }
         mp->ma_used++;
-        mp->ma_version_tag = DICT_NEXT_VERSION();
+        if (mp->ma_version_tag != 0)
+            mp->ma_version_tag = DICT_NEXT_VERSION();
         mp->ma_keys->dk_usable--;
         mp->ma_keys->dk_nentries++;
         assert(mp->ma_keys->dk_usable >= 0);
@@ -1092,7 +1093,8 @@ insertdict(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject *value)
         DK_ENTRIES(mp->ma_keys)[ix].me_value = value;
     }
 
-    mp->ma_version_tag = DICT_NEXT_VERSION();
+    if (mp->ma_version_tag != 0)
+        mp->ma_version_tag = DICT_NEXT_VERSION();
     Py_XDECREF(old_value); /* which **CAN** re-enter (see issue #22653) */
     assert(_PyDict_CheckConsistency(mp));
     Py_DECREF(key);
@@ -1515,7 +1517,8 @@ delitem_common(PyDictObject *mp, Py_hash_t hash, Py_ssize_t ix,
     assert(hashpos >= 0);
 
     mp->ma_used--;
-    mp->ma_version_tag = DICT_NEXT_VERSION();
+    if (mp->ma_version_tag != 0)
+        mp->ma_version_tag = DICT_NEXT_VERSION();
     ep = &DK_ENTRIES(mp->ma_keys)[ix];
     dictkeys_set_index(mp->ma_keys, hashpos, DKIX_DUMMY);
     ENSURE_ALLOWS_DELETIONS(mp);
@@ -1652,7 +1655,8 @@ PyDict_Clear(PyObject *op)
     mp->ma_keys = Py_EMPTY_KEYS;
     mp->ma_values = empty_values;
     mp->ma_used = 0;
-    mp->ma_version_tag = DICT_NEXT_VERSION();
+    if (mp->ma_version_tag != 0)
+        mp->ma_version_tag = DICT_NEXT_VERSION();
     /* ...then clear the keys and values */
     if (oldvalues != NULL) {
         n = oldkeys->dk_nentries;
@@ -1786,7 +1790,8 @@ _PyDict_Pop_KnownHash(PyObject *dict, PyObject *key, Py_hash_t hash, PyObject *d
     assert(hashpos >= 0);
     assert(old_value != NULL);
     mp->ma_used--;
-    mp->ma_version_tag = DICT_NEXT_VERSION();
+    if (mp->ma_version_tag != 0)
+        mp->ma_version_tag = DICT_NEXT_VERSION();
     dictkeys_set_index(mp->ma_keys, hashpos, DKIX_DUMMY);
     ep = &DK_ENTRIES(mp->ma_keys)[ix];
     ENSURE_ALLOWS_DELETIONS(mp);
@@ -2580,7 +2585,8 @@ PyDict_Copy(PyObject *o)
         split_copy->ma_values = newvalues;
         split_copy->ma_keys = mp->ma_keys;
         split_copy->ma_used = mp->ma_used;
-        split_copy->ma_version_tag = DICT_NEXT_VERSION();
+        if (split_copy->ma_version_tag != 0)
+            split_copy->ma_version_tag = DICT_NEXT_VERSION();
         dictkeys_incref(mp->ma_keys);
         for (i = 0, n = size; i < n; i++) {
             PyObject *value = mp->ma_values[i];
@@ -2860,7 +2866,8 @@ PyDict_SetDefault(PyObject *d, PyObject *key, PyObject *defaultobj)
             ep->me_value = value;
         }
         mp->ma_used++;
-        mp->ma_version_tag = DICT_NEXT_VERSION();
+        if (mp->ma_version_tag != 0)
+            mp->ma_version_tag = DICT_NEXT_VERSION();
         mp->ma_keys->dk_usable--;
         mp->ma_keys->dk_nentries++;
         assert(mp->ma_keys->dk_usable >= 0);
@@ -2873,7 +2880,8 @@ PyDict_SetDefault(PyObject *d, PyObject *key, PyObject *defaultobj)
         MAINTAIN_TRACKING(mp, key, value);
         mp->ma_values[ix] = value;
         mp->ma_used++;
-        mp->ma_version_tag = DICT_NEXT_VERSION();
+        if (mp->ma_version_tag != 0)
+            mp->ma_version_tag = DICT_NEXT_VERSION();
     }
 
     assert(_PyDict_CheckConsistency(mp));
@@ -2977,7 +2985,8 @@ dict_popitem(PyDictObject *mp, PyObject *Py_UNUSED(ignored))
     /* We can't dk_usable++ since there is DKIX_DUMMY in indices */
     mp->ma_keys->dk_nentries = i;
     mp->ma_used--;
-    mp->ma_version_tag = DICT_NEXT_VERSION();
+    if (mp->ma_version_tag != 0)
+        mp->ma_version_tag = DICT_NEXT_VERSION();
     assert(_PyDict_CheckConsistency(mp));
     return res;
 }
@@ -3188,7 +3197,8 @@ dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         _PyObject_GC_UNTRACK(d);
 
     d->ma_used = 0;
-    d->ma_version_tag = DICT_NEXT_VERSION();
+    if (d->ma_version_tag != 0)
+        d->ma_version_tag = DICT_NEXT_VERSION();
     d->ma_keys = new_keys_object(PyDict_MINSIZE);
     if (d->ma_keys == NULL) {
         Py_DECREF(self);
@@ -4570,4 +4580,13 @@ void
 _PyDictKeys_DecRef(PyDictKeysObject *keys)
 {
     dictkeys_decref(keys);
+}
+
+uint64_t
+_PyDict_GetVersion(PyObject *op)
+{
+    PyDictObject *mp = (PyDictObject *)op;
+    if (mp->ma_version_tag == 0)
+        mp->ma_version_tag = DICT_NEXT_VERSION();
+    return mp->ma_version_tag;
 }

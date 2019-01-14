@@ -4329,7 +4329,7 @@ dict_get_version(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "O!", &PyDict_Type, &dict))
         return NULL;
 
-    version = dict->ma_version_tag;
+    version = _PyDict_GetVersion((PyObject*)dict);
 
     Py_BUILD_ASSERT(sizeof(unsigned PY_LONG_LONG) >= sizeof(version));
     return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG)version);
