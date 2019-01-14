@@ -1345,11 +1345,16 @@ make_keys_shared(PyObject *op)
             ep1[i].me_hash = ep0[i].me_hash;
             ep1[i].me_key = ep0[i].me_key;
             values[i] = ep0[i].me_value;
-            ep0[i].me_key = NULL;
-            ep0[i].me_value = NULL;
         }
 
-        dictkeys_decref(oldkeys);
+        /* We know that oldkeys->dk_refcnt is exactly 1 */
+        _Py_DEC_REFTOTAL;
+        if (oldkeys->dk_size == PyDict_MINSIZE
+                && numcombinedfreekeys < PyDict_MAXFREELIST) {
+            combined_keys_free_list[numcombinedfreekeys++] = oldkeys;
+        } else {
+            PyObject_FREE(oldkeys);
+        }
         mp->ma_keys = newkeys;
         mp->ma_values = values;
     }
