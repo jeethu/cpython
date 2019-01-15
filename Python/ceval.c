@@ -1130,7 +1130,8 @@ main_loop:
             FAST_DISPATCH();
         }
 
-        case TARGET(LOAD_FAST): {
+        case TARGET(LOAD_FAST):
+        case TARGET(LOAD_FAST_REF): {
             PyObject *value = GETLOCAL(oparg);
             if (value == NULL) {
                 format_exc_check_arg(PyExc_UnboundLocalError,
@@ -1138,15 +1139,18 @@ main_loop:
                                      PyTuple_GetItem(co->co_varnames, oparg));
                 goto error;
             }
-            Py_INCREF(value);
+            if(opcode == LOAD_FAST)
+                Py_INCREF(value);
             PUSH(value);
             FAST_DISPATCH();
         }
 
-        case TARGET(LOAD_CONST): {
+        case TARGET(LOAD_CONST):
+        case TARGET(LOAD_CONST_REF): {
             PREDICTED(LOAD_CONST);
             PyObject *value = GETITEM(consts, oparg);
-            Py_INCREF(value);
+            if (opcode == LOAD_CONST)
+                Py_INCREF(value);
             PUSH(value);
             FAST_DISPATCH();
         }
@@ -1265,7 +1269,8 @@ main_loop:
             PyObject *base = TOP();
             PyObject *res = PyNumber_Power(base, exp, Py_None);
             Py_DECREF(base);
-            Py_DECREF(exp);
+            if(!(oparg & 1))
+                Py_DECREF(exp);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1277,7 +1282,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_Multiply(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1289,7 +1295,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_MatrixMultiply(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1301,7 +1308,8 @@ main_loop:
             PyObject *dividend = TOP();
             PyObject *quotient = PyNumber_TrueDivide(dividend, divisor);
             Py_DECREF(dividend);
-            Py_DECREF(divisor);
+            if(!(oparg & 1))
+                Py_DECREF(divisor);
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -1313,7 +1321,8 @@ main_loop:
             PyObject *dividend = TOP();
             PyObject *quotient = PyNumber_FloorDivide(dividend, divisor);
             Py_DECREF(dividend);
-            Py_DECREF(divisor);
+            if(!(oparg & 1))
+                Py_DECREF(divisor);
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -1332,7 +1341,8 @@ main_loop:
             } else {
               res = PyNumber_Remainder(dividend, divisor);
             }
-            Py_DECREF(divisor);
+            if(!(oparg & 1))
+                Py_DECREF(divisor);
             Py_DECREF(dividend);
             SET_TOP(res);
             if (res == NULL)
@@ -1359,7 +1369,8 @@ main_loop:
                 sum = PyNumber_Add(left, right);
                 Py_DECREF(left);
             }
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(sum);
             if (sum == NULL)
                 goto error;
@@ -1370,7 +1381,8 @@ main_loop:
             PyObject *right = POP();
             PyObject *left = TOP();
             PyObject *diff = PyNumber_Subtract(left, right);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             Py_DECREF(left);
             SET_TOP(diff);
             if (diff == NULL)
@@ -1383,7 +1395,8 @@ main_loop:
             PyObject *container = TOP();
             PyObject *res = PyObject_GetItem(container, sub);
             Py_DECREF(container);
-            Py_DECREF(sub);
+            if(!(oparg & 1))
+                Py_DECREF(sub);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1395,7 +1408,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_Lshift(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1407,7 +1421,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_Rshift(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1419,7 +1434,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_And(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1431,7 +1447,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_Xor(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1443,7 +1460,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_Or(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1455,7 +1473,8 @@ main_loop:
             PyObject *list = PEEK(oparg);
             int err;
             err = PyList_Append(list, v);
-            Py_DECREF(v);
+            if(!(oparg & 1))
+                Py_DECREF(v);
             if (err != 0)
                 goto error;
             PREDICT(JUMP_ABSOLUTE);
@@ -1479,7 +1498,8 @@ main_loop:
             PyObject *base = TOP();
             PyObject *res = PyNumber_InPlacePower(base, exp, Py_None);
             Py_DECREF(base);
-            Py_DECREF(exp);
+            if(!(oparg & 1))
+                Py_DECREF(exp);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1491,7 +1511,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_InPlaceMultiply(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1503,7 +1524,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_InPlaceMatrixMultiply(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1515,7 +1537,8 @@ main_loop:
             PyObject *dividend = TOP();
             PyObject *quotient = PyNumber_InPlaceTrueDivide(dividend, divisor);
             Py_DECREF(dividend);
-            Py_DECREF(divisor);
+            if(!(oparg & 1))
+                Py_DECREF(divisor);
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -1527,7 +1550,8 @@ main_loop:
             PyObject *dividend = TOP();
             PyObject *quotient = PyNumber_InPlaceFloorDivide(dividend, divisor);
             Py_DECREF(dividend);
-            Py_DECREF(divisor);
+            if(!(oparg & 1))
+                Py_DECREF(divisor);
             SET_TOP(quotient);
             if (quotient == NULL)
                 goto error;
@@ -1539,7 +1563,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *mod = PyNumber_InPlaceRemainder(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(mod);
             if (mod == NULL)
                 goto error;
@@ -1558,7 +1583,8 @@ main_loop:
                 sum = PyNumber_InPlaceAdd(left, right);
                 Py_DECREF(left);
             }
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(sum);
             if (sum == NULL)
                 goto error;
@@ -1570,7 +1596,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *diff = PyNumber_InPlaceSubtract(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(diff);
             if (diff == NULL)
                 goto error;
@@ -1582,7 +1609,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_InPlaceLshift(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1594,7 +1622,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_InPlaceRshift(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1606,7 +1635,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_InPlaceAnd(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1618,7 +1648,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_InPlaceXor(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1630,7 +1661,8 @@ main_loop:
             PyObject *left = TOP();
             PyObject *res = PyNumber_InPlaceOr(left, right);
             Py_DECREF(left);
-            Py_DECREF(right);
+            if(!(oparg & 1))
+                Py_DECREF(right);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1647,7 +1679,8 @@ main_loop:
             err = PyObject_SetItem(container, sub, v);
             Py_DECREF(v);
             Py_DECREF(container);
-            Py_DECREF(sub);
+            if(!(oparg & 1))
+                Py_DECREF(sub);
             if (err != 0)
                 goto error;
             DISPATCH();
@@ -1661,7 +1694,8 @@ main_loop:
             /* del container[sub] */
             err = PyObject_DelItem(container, sub);
             Py_DECREF(container);
-            Py_DECREF(sub);
+            if(!(oparg & 1))
+                Py_DECREF(sub);
             if (err != 0)
                 goto error;
             DISPATCH();

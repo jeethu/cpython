@@ -998,6 +998,8 @@ stack_effect(int opcode, int oparg, int jump)
             return 0;
         case LOAD_CONST:
             return 1;
+        case LOAD_CONST_REF:
+            return 1;
         case LOAD_NAME:
             return 1;
         case BUILD_TUPLE:
@@ -1057,6 +1059,8 @@ stack_effect(int opcode, int oparg, int jump)
             return jump ? 1 : 0;
 
         case LOAD_FAST:
+            return 1;
+        case LOAD_FAST_REF:
             return 1;
         case STORE_FAST:
             return -1;

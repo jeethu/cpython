@@ -138,6 +138,8 @@ name_op('STORE_GLOBAL', 97)     # ""
 name_op('DELETE_GLOBAL', 98)    # ""
 def_op('LOAD_CONST', 100)       # Index in const list
 hasconst.append(100)
+def_op('LOAD_CONST_REF', 123)
+hasconst.append(123)
 name_op('LOAD_NAME', 101)       # Index in name list
 def_op('BUILD_TUPLE', 102)      # Number of tuple items
 def_op('BUILD_LIST', 103)       # Number of list items
@@ -162,6 +164,8 @@ jrel_op('SETUP_FINALLY', 122)   # Distance to target address
 
 def_op('LOAD_FAST', 124)        # Local variable number
 haslocal.append(124)
+def_op('LOAD_FAST_REF', 127)        # Local variable number
+haslocal.append(127)
 def_op('STORE_FAST', 125)       # Local variable number
 haslocal.append(125)
 def_op('DELETE_FAST', 126)      # Local variable number

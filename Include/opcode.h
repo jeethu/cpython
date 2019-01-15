@@ -95,9 +95,11 @@ extern "C" {
 #define POP_JUMP_IF_TRUE        115
 #define LOAD_GLOBAL             116
 #define SETUP_FINALLY           122
+#define LOAD_CONST_REF          123
 #define LOAD_FAST               124
 #define STORE_FAST              125
 #define DELETE_FAST             126
+#define LOAD_FAST_REF           127
 #define RAISE_VARARGS           130
 #define CALL_FUNCTION           131
 #define MAKE_FUNCTION           132

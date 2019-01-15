@@ -185,17 +185,17 @@ class TestTranforms(BytecodeTestCase):
         # Verify that unfoldables are skipped
         code = compile('a=2+"b"', '', 'single')
         self.assertInBytecode(code, 'LOAD_CONST', 2)
-        self.assertInBytecode(code, 'LOAD_CONST', 'b')
+        self.assertInBytecode(code, 'LOAD_CONST_REF', 'b')
 
         # Verify that large sequences do not result from folding
         code = compile('a="x"*10000', '', 'single')
-        self.assertInBytecode(code, 'LOAD_CONST', 10000)
+        self.assertInBytecode(code, 'LOAD_CONST_REF', 10000)
         self.assertNotIn("x"*10000, code.co_consts)
         code = compile('a=1<<1000', '', 'single')
-        self.assertInBytecode(code, 'LOAD_CONST', 1000)
+        self.assertInBytecode(code, 'LOAD_CONST_REF', 1000)
         self.assertNotIn(1<<1000, code.co_consts)
         code = compile('a=2**1000', '', 'single')
-        self.assertInBytecode(code, 'LOAD_CONST', 1000)
+        self.assertInBytecode(code, 'LOAD_CONST_REF', 1000)
         self.assertNotIn(2**1000, code.co_consts)
 
     def test_binary_subscr_on_unicode(self):
