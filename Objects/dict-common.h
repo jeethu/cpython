@@ -8,11 +8,12 @@ typedef struct {
     PyObject *me_value; /* This field is only meaningful for combined tables */
 } PyDictKeyEntry;
 
-/* dict_lookup_func() returns index of entry which can be used like DK_ENTRIES(dk)[index].
- * -1 when no entry found, -3 when compare raises error.
- */
-typedef Py_ssize_t (*dict_lookup_func)
-    (PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject **value_addr);
+typedef enum {
+    DK_LOOKUP_UNICODE,
+    DK_LOOKUP_UNICODE_NODUMMY,
+    DK_LOOKUP_SPLIT,
+    DK_LOOKUP_DEFAULT
+} PyDictLookupType;
 
 #define DKIX_EMPTY (-1)
 #define DKIX_DUMMY (-2)  /* Used internally */
@@ -38,7 +39,7 @@ struct _dictkeysobject {
          specialized for Unicode string keys that cannot be the <dummy> value.
 
        - lookdict_split(): Version of lookdict() for split tables. */
-    dict_lookup_func dk_lookup;
+    PyDictLookupType dk_lookup;
 
     /* Number of usable entries in dk_entries. */
     Py_ssize_t dk_usable;

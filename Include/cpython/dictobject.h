@@ -60,6 +60,7 @@ PyAPI_FUNC(PyObject *) _PyDict_Pop(PyObject *, PyObject *, PyObject *);
 PyObject *_PyDict_Pop_KnownHash(PyObject *, PyObject *, Py_hash_t, PyObject *);
 PyObject *_PyDict_FromKeys(PyObject *, PyObject *, PyObject *);
 #define _PyDict_HasSplitTable(d) ((d)->ma_values != NULL)
+Py_ssize_t _PyDict_Lookup(PyDictObject *mp, PyObject *key, Py_hash_t hash, PyObject **value_addr);
 
 PyAPI_FUNC(int) PyDict_ClearFreeList(void);
 
