@@ -115,6 +115,7 @@ converting the dict to the combined table.
 #include "pycore_pystate.h"
 #include "dict-common.h"
 #include "stringlib/eq.h"    /* to get unicode_eq() */
+#include "pycore_intrinsics.h"
 
 /*[clinic input]
 class dict "PyDictObject *" "&PyDict_Type"
@@ -1141,10 +1142,14 @@ dictresize(PyDictObject *mp, Py_ssize_t minsize)
     PyDictKeyEntry *oldentries, *newentries;
 
     /* Find the smallest table size > minused. */
+#ifdef INTRINSIC_NEAREST_POWER_OF_TWO
+    newsize = INTRINSIC_NEAREST_POWER_OF_TWO(minsize, PyDict_MINSIZE);
+#else
     for (newsize = PyDict_MINSIZE;
          newsize < minsize && newsize > 0;
          newsize <<= 1)
         ;
+#endif
     if (newsize <= 0) {
         PyErr_NoMemory();
         return -1;
@@ -1285,10 +1290,14 @@ _PyDict_NewPresized(Py_ssize_t minused)
     }
     else {
         Py_ssize_t minsize = ESTIMATE_SIZE(minused);
+#ifdef INTRINSIC_NEAREST_POWER_OF_TWO
+        newsize = INTRINSIC_NEAREST_POWER_OF_TWO(minsize, PyDict_MINSIZE);
+#else
         newsize = PyDict_MINSIZE;
         while (newsize < minsize) {
             newsize <<= 1;
         }
+#endif
     }
     assert(IS_POWER_OF_2(newsize));
 
