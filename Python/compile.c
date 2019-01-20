@@ -908,6 +908,7 @@ stack_effect(int opcode, int oparg, int jump)
         case BINARY_SUBSCR:
         case BINARY_FLOOR_DIVIDE:
         case BINARY_TRUE_DIVIDE:
+        case BINARY_SUBSCR_REF:
             return -1;
         case INPLACE_FLOOR_DIVIDE:
         case INPLACE_TRUE_DIVIDE:

@@ -213,6 +213,16 @@ markblocks(_Py_CODEUNIT *code, Py_ssize_t len)
     return blocks;
 }
 
+unsigned char
+get_ref_op(unsigned char op) {
+    switch(op) {
+        case BINARY_SUBSCR:
+            return BINARY_SUBSCR_REF;
+        default:
+            return op;
+    }
+}
+
 /* Perform basic peephole optimizations to components of a code object.
    The consts object should still be in list form to allow new constants
    to be appended.
@@ -444,35 +454,7 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                 }
                 break;
 
-            case BINARY_POWER:
-            case BINARY_MULTIPLY:
-            case BINARY_MATRIX_MULTIPLY:
-            case BINARY_TRUE_DIVIDE:
-            case BINARY_FLOOR_DIVIDE:
-            case BINARY_MODULO:
-            case BINARY_ADD:
-            case BINARY_SUBTRACT:
-            case BINARY_SUBSCR:
-            case BINARY_LSHIFT:
-            case BINARY_RSHIFT:
-            case BINARY_AND:
-            case BINARY_XOR:
-            case BINARY_OR:
-            case INPLACE_POWER:
-            case INPLACE_MULTIPLY:
-            case INPLACE_MATRIX_MULTIPLY:
-            case INPLACE_TRUE_DIVIDE:
-            case INPLACE_FLOOR_DIVIDE:
-            case INPLACE_MODULO:
-            case INPLACE_ADD:
-            case INPLACE_SUBTRACT:
-            case INPLACE_LSHIFT:
-            case INPLACE_RSHIFT:
-            case INPLACE_AND:
-            case INPLACE_XOR:
-            case INPLACE_OR:
-            case STORE_SUBSCR:
-            case DELETE_SUBSCR:
+            case BINARY_SUBSCR: {
                 if (i > 0 && ISBASICBLOCK(blocks, i - 1, i)) {
                     unsigned char last_opcode = _Py_OPCODE(codestr[i - 1]);
                     if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
@@ -481,10 +463,11 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                             changed_opcode = LOAD_FAST_REF;
                         j = get_arg(codestr, i - 1);
                         codestr[i - 1] = PACKOPARG(changed_opcode, j);
-                        codestr[i] = PACKOPARG(opcode, 1);
+                        codestr[i] = PACKOPARG(get_ref_op(opcode), 0);
                     }
                 }
                 break;
+            }
         }
     }
 

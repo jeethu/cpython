@@ -83,6 +83,7 @@ def_op('BINARY_FLOOR_DIVIDE', 26)
 def_op('BINARY_TRUE_DIVIDE', 27)
 def_op('INPLACE_FLOOR_DIVIDE', 28)
 def_op('INPLACE_TRUE_DIVIDE', 29)
+def_op('BINARY_SUBSCR_REF', 30)
 
 def_op('GET_AITER', 50)
 def_op('GET_ANEXT', 51)
