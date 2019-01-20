@@ -474,14 +474,13 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
             case STORE_SUBSCR:
             case DELETE_SUBSCR:
                 if (i > 0 && ISBASICBLOCK(blocks, i - 1, i)) {
-                    if (_Py_OPCODE(codestr[i - 1]) == LOAD_CONST) {
+                    unsigned char last_opcode = _Py_OPCODE(codestr[i - 1]);
+                    if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
+                        unsigned char changed_opcode = LOAD_CONST_REF;
+                        if (last_opcode == LOAD_FAST)
+                            changed_opcode = LOAD_FAST_REF;
                         j = get_arg(codestr, i - 1);
-                        codestr[i - 1] = PACKOPARG(LOAD_CONST_REF, j);
-                        codestr[i] = PACKOPARG(opcode, 1);
-                    }
-                    else if (_Py_OPCODE(codestr[i - 1]) == LOAD_FAST) {
-                        j = get_arg(codestr, i - 1);
-                        codestr[i - 1] = PACKOPARG(LOAD_FAST_REF, j);
+                        codestr[i - 1] = PACKOPARG(changed_opcode, j);
                         codestr[i] = PACKOPARG(opcode, 1);
                     }
                 }
