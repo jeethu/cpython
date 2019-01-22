@@ -216,8 +216,14 @@ markblocks(_Py_CODEUNIT *code, Py_ssize_t len)
 unsigned char
 get_ref_op(unsigned char op) {
     switch(op) {
+        case LOAD_CONST:
+            return LOAD_CONST_REF;
+        case LOAD_FAST:
+            return LOAD_FAST_REF;
         case BINARY_SUBSCR:
             return BINARY_SUBSCR_REF;
+        case STORE_SUBSCR:
+            return STORE_SUBSCR_REF;
         default:
             return op;
     }
@@ -454,20 +460,49 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                 }
                 break;
 
-            case BINARY_SUBSCR: {
+            case BINARY_SUBSCR:
+            case STORE_SUBSCR:
                 if (i > 0 && ISBASICBLOCK(blocks, i - 1, i)) {
+                    unsigned int instr_oparg = 0xFF;
                     unsigned char last_opcode = _Py_OPCODE(codestr[i - 1]);
                     if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
-                        unsigned char changed_opcode = LOAD_CONST_REF;
-                        if (last_opcode == LOAD_FAST)
-                            changed_opcode = LOAD_FAST_REF;
-                        j = get_arg(codestr, i - 1);
-                        codestr[i - 1] = PACKOPARG(changed_opcode, j);
-                        codestr[i] = PACKOPARG(get_ref_op(opcode), 0);
+                        codestr[i - 1] = PACKOPARG(get_ref_op(last_opcode),
+                                                   get_arg(codestr, i - 1));
+                        codestr[i] = PACKOPARG(get_ref_op(opcode), instr_oparg);
+
+                        /* Try to optimize the LOAD_(FAST|CONST) 1 instruction behind */
+                        j = 2;
+                        while (i >= j && _Py_OPCODE(codestr[i - j]) == EXTENDED_ARG) {
+                            j++;
+                        }
+                        if (i >= j && ISBASICBLOCK(blocks, i - j, i)) {
+                            last_opcode = _Py_OPCODE(codestr[i - j]);
+                            if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
+                                codestr[i - j] = PACKOPARG(get_ref_op(last_opcode),
+                                                           get_arg(codestr, i - j));
+                                instr_oparg &= 0xFE;
+                                codestr[i] = PACKOPARG(get_ref_op(opcode), instr_oparg);
+                                if (opcode == STORE_SUBSCR) {
+                                    /* Try to optimize the LOAD_(FAST|CONST) 2 instructions behind */
+                                    j = 3;
+                                    while (i >= j && _Py_OPCODE(codestr[i - j]) == EXTENDED_ARG) {
+                                        j++;
+                                    }
+                                    if (i >= j && ISBASICBLOCK(blocks, i - j, i)) {
+                                        last_opcode = _Py_OPCODE(codestr[i - j]);
+                                        if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
+                                            codestr[i - j] = PACKOPARG(get_ref_op(last_opcode),
+                                                                       get_arg(codestr, i - j));
+                                            instr_oparg &= 0xFD;
+                                            codestr[i] = PACKOPARG(get_ref_op(opcode), instr_oparg);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 break;
-            }
         }
     }
 

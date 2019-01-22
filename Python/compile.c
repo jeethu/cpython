@@ -921,6 +921,7 @@ stack_effect(int opcode, int oparg, int jump)
         case INPLACE_MODULO:
             return -1;
         case STORE_SUBSCR:
+        case STORE_SUBSCR_REF:
             return -3;
         case DELETE_SUBSCR:
             return -2;

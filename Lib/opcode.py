@@ -83,7 +83,6 @@ def_op('BINARY_FLOOR_DIVIDE', 26)
 def_op('BINARY_TRUE_DIVIDE', 27)
 def_op('INPLACE_FLOOR_DIVIDE', 28)
 def_op('INPLACE_TRUE_DIVIDE', 29)
-def_op('BINARY_SUBSCR_REF', 30)
 
 def_op('GET_AITER', 50)
 def_op('GET_ANEXT', 51)
@@ -160,6 +159,8 @@ jabs_op('POP_JUMP_IF_FALSE', 114)    # ""
 jabs_op('POP_JUMP_IF_TRUE', 115)     # ""
 
 name_op('LOAD_GLOBAL', 116)     # Index in name list
+def_op('BINARY_SUBSCR_REF', 117)
+def_op('STORE_SUBSCR_REF', 118)
 
 jrel_op('SETUP_FINALLY', 122)   # Distance to target address
 

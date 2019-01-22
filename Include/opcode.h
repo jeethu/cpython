@@ -30,7 +30,6 @@ extern "C" {
 #define BINARY_TRUE_DIVIDE       27
 #define INPLACE_FLOOR_DIVIDE     28
 #define INPLACE_TRUE_DIVIDE      29
-#define BINARY_SUBSCR_REF        30
 #define GET_AITER                50
 #define GET_ANEXT                51
 #define BEFORE_ASYNC_WITH        52
@@ -95,6 +94,8 @@ extern "C" {
 #define POP_JUMP_IF_FALSE       114
 #define POP_JUMP_IF_TRUE        115
 #define LOAD_GLOBAL             116
+#define BINARY_SUBSCR_REF       117
+#define STORE_SUBSCR_REF        118
 #define SETUP_FINALLY           122
 #define LOAD_CONST_REF          123
 #define LOAD_FAST               124

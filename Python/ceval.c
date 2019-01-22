@@ -1412,7 +1412,8 @@ main_loop:
             PyObject *sub = POP();
             PyObject *container = TOP();
             PyObject *res = PyObject_GetItem(container, sub);
-            Py_DECREF(container);
+            if (oparg & 0x01)
+                Py_DECREF(container);
             SET_TOP(res);
             if (res == NULL)
                 goto error;
@@ -1677,6 +1678,23 @@ main_loop:
             Py_DECREF(v);
             Py_DECREF(container);
             Py_DECREF(sub);
+            if (err != 0)
+                goto error;
+            DISPATCH();
+        }
+
+        case TARGET(STORE_SUBSCR_REF): {
+            PyObject *sub = TOP();
+            PyObject *container = SECOND();
+            PyObject *v = THIRD();
+            int err;
+            STACK_SHRINK(3);
+            /* container[sub] = v */
+            err = PyObject_SetItem(container, sub, v);
+            if (oparg & 0x01)
+                Py_DECREF(container);
+            if (oparg & 0x02)
+                Py_DECREF(v);
             if (err != 0)
                 goto error;
             DISPATCH();

@@ -229,15 +229,15 @@ dis_annot_stmt_str = """\
               4 STORE_NAME               0 (x)
               6 LOAD_NAME                1 (int)
               8 LOAD_NAME                2 (__annotations__)
-             10 LOAD_CONST               1 ('x')
-             12 STORE_SUBSCR
+             10 LOAD_CONST_REF           1 ('x')
+             12 STORE_SUBSCR_REF       255
 
   3          14 LOAD_NAME                3 (fun)
              16 LOAD_CONST               0 (1)
              18 CALL_FUNCTION            1
              20 LOAD_NAME                2 (__annotations__)
-             22 LOAD_CONST               2 ('y')
-             24 STORE_SUBSCR
+             22 LOAD_CONST_REF           2 ('y')
+             24 STORE_SUBSCR_REF       255
 
   4          26 LOAD_CONST               0 (1)
              28 LOAD_NAME                4 (lst)
