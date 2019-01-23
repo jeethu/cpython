@@ -41,8 +41,8 @@ dis_c_instance_method = """\
 %3d           0 LOAD_FAST                1 (x)
               2 LOAD_CONST               1 (1)
               4 COMPARE_OP               2 (==)
-              6 LOAD_FAST                0 (self)
-              8 STORE_ATTR               0 (x)
+              6 LOAD_FAST_REF            0 (self)
+              8 STORE_ATTR_REF         128 (x)
              10 LOAD_CONST               0 (None)
              12 RETURN_VALUE
 """ % (_C.__init__.__code__.co_firstlineno + 1,)
@@ -51,8 +51,8 @@ dis_c_instance_method_bytes = """\
           0 LOAD_FAST                1 (1)
           2 LOAD_CONST               1 (1)
           4 COMPARE_OP               2 (==)
-          6 LOAD_FAST                0 (0)
-          8 STORE_ATTR               0 (0)
+          6 LOAD_FAST_REF            0 (0)
+          8 STORE_ATTR_REF         128 (0)
          10 LOAD_CONST               0 (0)
          12 RETURN_VALUE
 """
@@ -61,8 +61,8 @@ dis_c_class_method = """\
 %3d           0 LOAD_FAST                1 (x)
               2 LOAD_CONST               1 (1)
               4 COMPARE_OP               2 (==)
-              6 LOAD_FAST                0 (cls)
-              8 STORE_ATTR               0 (x)
+              6 LOAD_FAST_REF            0 (cls)
+              8 STORE_ATTR_REF         128 (x)
              10 LOAD_CONST               0 (None)
              12 RETURN_VALUE
 """ % (_C.cm.__code__.co_firstlineno + 2,)
@@ -289,8 +289,8 @@ dis_traceback = """\
              26 POP_TOP
              28 SETUP_FINALLY           10 (to 40)
 
-%3d          30 LOAD_FAST                0 (e)
-             32 LOAD_ATTR                1 (__traceback__)
+%3d          30 LOAD_FAST_REF            0 (e)
+             32 LOAD_ATTR_REF            1 (__traceback__)
              34 STORE_FAST               1 (tb)
              36 POP_BLOCK
              38 BEGIN_FINALLY

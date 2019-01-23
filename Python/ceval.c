@@ -1417,7 +1417,7 @@ main_loop:
             SET_TOP(res);
             if (res == NULL)
                 goto error;
-            DISPATCH();
+            FAST_DISPATCH();
         }
 
         case TARGET(BINARY_LSHIFT): {
@@ -1697,7 +1697,7 @@ main_loop:
                 Py_DECREF(v);
             if (err != 0)
                 goto error;
-            DISPATCH();
+            FAST_DISPATCH();
         }
 
         case TARGET(DELETE_SUBSCR): {
@@ -2226,6 +2226,20 @@ main_loop:
             if (err != 0)
                 goto error;
             DISPATCH();
+        }
+
+        case TARGET(STORE_ATTR_REF): {
+            PyObject *name = GETITEM(names, oparg & 0x7F);
+            PyObject *owner = TOP();
+            PyObject *v = SECOND();
+            int err;
+            STACK_SHRINK(2);
+            err = PyObject_SetAttr(owner, name, v);
+            if (oparg & 0x80)
+                Py_DECREF(v);
+            if (err != 0)
+                goto error;
+            FAST_DISPATCH();
         }
 
         case TARGET(DELETE_ATTR): {
@@ -2777,6 +2791,16 @@ main_loop:
             if (res == NULL)
                 goto error;
             DISPATCH();
+        }
+
+        case TARGET(LOAD_ATTR_REF): {
+            PyObject *name = GETITEM(names, oparg);
+            PyObject *owner = TOP();
+            PyObject *res = PyObject_GetAttr(owner, name);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            FAST_DISPATCH();
         }
 
         case TARGET(COMPARE_OP): {

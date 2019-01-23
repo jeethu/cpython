@@ -991,6 +991,7 @@ stack_effect(int opcode, int oparg, int jump)
             return jump > 0 ? -1 : 1;
 
         case STORE_ATTR:
+        case STORE_ATTR_REF:
             return -2;
         case DELETE_ATTR:
             return -1;
@@ -999,7 +1000,6 @@ stack_effect(int opcode, int oparg, int jump)
         case DELETE_GLOBAL:
             return 0;
         case LOAD_CONST:
-            return 1;
         case LOAD_CONST_REF:
             return 1;
         case LOAD_NAME:
@@ -1021,6 +1021,7 @@ stack_effect(int opcode, int oparg, int jump)
         case BUILD_CONST_KEY_MAP:
             return -oparg;
         case LOAD_ATTR:
+        case LOAD_ATTR_REF:
             return 0;
         case COMPARE_OP:
             return -1;

@@ -4,9 +4,9 @@ opcode module - potentially shared between dis and other modules which
 operate on bytecodes (e.g. peephole optimizers).
 """
 
-__all__ = ["cmp_op", "hasconst", "hasname", "hasjrel", "hasjabs",
-           "haslocal", "hascompare", "hasfree", "opname", "opmap",
-           "HAVE_ARGUMENT", "EXTENDED_ARG", "hasnargs"]
+__all__ = ["cmp_op", "hasconst", "hasname", "hasmask", "hasjrel",
+           "hasjabs", "haslocal", "hascompare", "hasfree","opname",
+           "opmap", "HAVE_ARGUMENT", "EXTENDED_ARG", "hasnargs"]
 
 # It's a chicken-and-egg I'm afraid:
 # We're imported before _opcode's made.
@@ -29,6 +29,7 @@ hasname = []
 hasjrel = []
 hasjabs = []
 haslocal = []
+hasmask = {}
 hascompare = []
 hasfree = []
 hasnargs = [] # unused
@@ -40,9 +41,11 @@ def def_op(name, op):
     opname[op] = name
     opmap[name] = op
 
-def name_op(name, op):
+def name_op(name, op, mask=None):
     def_op(name, op)
     hasname.append(op)
+    if mask is not None:
+        hasmask[op] = mask
 
 def jrel_op(name, op):
     def_op(name, op)
@@ -161,6 +164,8 @@ jabs_op('POP_JUMP_IF_TRUE', 115)     # ""
 name_op('LOAD_GLOBAL', 116)     # Index in name list
 def_op('BINARY_SUBSCR_REF', 117)
 def_op('STORE_SUBSCR_REF', 118)
+name_op('LOAD_ATTR_REF', 119)
+name_op('STORE_ATTR_REF', 120, 0x7F)  # Index in name list
 
 jrel_op('SETUP_FINALLY', 122)   # Distance to target address
 

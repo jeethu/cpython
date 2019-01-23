@@ -336,7 +336,10 @@ def _get_instructions_bytes(code, varnames=None, names=None, constants=None,
             if op in hasconst:
                 argval, argrepr = _get_const_info(arg, constants)
             elif op in hasname:
-                argval, argrepr = _get_name_info(arg, names)
+                if op in hasmask:
+                    argval, argrepr = _get_name_info(arg & hasmask[op], names)
+                else:
+                    argval, argrepr = _get_name_info(arg, names)
             elif op in hasjrel:
                 argval = offset + 2 + arg
                 argrepr = "to " + repr(argval)
