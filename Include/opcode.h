@@ -98,6 +98,7 @@ extern "C" {
 #define STORE_SUBSCR_REF        118
 #define LOAD_ATTR_REF           119
 #define STORE_ATTR_REF          120
+#define COMPARE_OP_REF          121
 #define SETUP_FINALLY           122
 #define LOAD_CONST_REF          123
 #define LOAD_FAST               124

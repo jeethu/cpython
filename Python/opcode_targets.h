@@ -120,7 +120,7 @@ static void *opcode_targets[256] = {
     &&TARGET_STORE_SUBSCR_REF,
     &&TARGET_LOAD_ATTR_REF,
     &&TARGET_STORE_ATTR_REF,
-    &&_unknown_opcode,
+    &&TARGET_COMPARE_OP_REF,
     &&TARGET_SETUP_FINALLY,
     &&TARGET_LOAD_CONST_REF,
     &&TARGET_LOAD_FAST,

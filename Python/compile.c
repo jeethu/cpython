@@ -1024,6 +1024,7 @@ stack_effect(int opcode, int oparg, int jump)
         case LOAD_ATTR_REF:
             return 0;
         case COMPARE_OP:
+        case COMPARE_OP_REF:
             return -1;
         case IMPORT_NAME:
             return -1;

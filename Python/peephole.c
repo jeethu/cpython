@@ -216,6 +216,8 @@ markblocks(_Py_CODEUNIT *code, Py_ssize_t len)
 unsigned char
 get_ref_op(unsigned char op) {
     switch (op) {
+        case COMPARE_OP:
+            return COMPARE_OP_REF;
         case LOAD_ATTR:
             return LOAD_ATTR_REF;
         case LOAD_CONST:
@@ -465,6 +467,7 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                 break;
 
             case BINARY_SUBSCR:
+            case COMPARE_OP:
             case STORE_SUBSCR:
             case LOAD_ATTR:
             case STORE_ATTR:
@@ -486,7 +489,7 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                                                    get_arg(codestr, i - j));
                         if (opcode == LOAD_ATTR)
                             instr_oparg = get_arg(codestr, i);
-                        else if (opcode == STORE_ATTR)
+                        else if (opcode == COMPARE_OP || opcode == STORE_ATTR)
                             instr_oparg = get_arg(codestr, i) | 0x80;
                         codestr[i] = PACKOPARG(get_ref_op(opcode), instr_oparg);
 
@@ -502,7 +505,7 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                             if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
                                 codestr[i - j] = PACKOPARG(get_ref_op(last_opcode),
                                                            get_arg(codestr, i - j));
-                                if (opcode == STORE_ATTR)
+                                if (opcode == COMPARE_OP || opcode == STORE_ATTR)
                                     instr_oparg &= 0x7F;
                                 else
                                     instr_oparg &= 0xFE;

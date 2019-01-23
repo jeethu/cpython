@@ -129,7 +129,7 @@ class TestTranforms(BytecodeTestCase):
             ('a not in [(1, 2), 3, 4]', ((1, 2), 3, 4)),
             ):
             code = compile(line, '', 'single')
-            self.assertInBytecode(code, 'LOAD_CONST', elem)
+            self.assertInBytecode(code, 'LOAD_CONST_REF', elem)
             self.assertNotInBytecode(code, 'BUILD_LIST')
 
     def test_folding_of_sets_of_constants(self):
@@ -143,7 +143,7 @@ class TestTranforms(BytecodeTestCase):
             ):
             code = compile(line, '', 'single')
             self.assertNotInBytecode(code, 'BUILD_SET')
-            self.assertInBytecode(code, 'LOAD_CONST', elem)
+            self.assertInBytecode(code, 'LOAD_CONST_REF', elem)
 
         # Ensure that the resulting code actually works:
         def f(a):

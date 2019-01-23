@@ -346,7 +346,10 @@ def _get_instructions_bytes(code, varnames=None, names=None, constants=None,
             elif op in haslocal:
                 argval, argrepr = _get_name_info(arg, varnames)
             elif op in hascompare:
-                argval = cmp_op[arg]
+                if op in hasmask:
+                    argval = cmp_op[arg & hasmask[op]]
+                else:
+                    argval = cmp_op[arg]
                 argrepr = argval
             elif op in hasfree:
                 argval, argrepr = _get_name_info(arg, cells)

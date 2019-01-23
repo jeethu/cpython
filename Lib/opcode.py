@@ -37,9 +37,11 @@ hasnargs = [] # unused
 opmap = {}
 opname = ['<%r>' % (op,) for op in range(256)]
 
-def def_op(name, op):
+def def_op(name, op, mask=None):
     opname[op] = name
     opmap[name] = op
+    if mask is not None:
+        hasmask[op] = mask
 
 def name_op(name, op, mask=None):
     def_op(name, op)
@@ -166,6 +168,8 @@ def_op('BINARY_SUBSCR_REF', 117)
 def_op('STORE_SUBSCR_REF', 118)
 name_op('LOAD_ATTR_REF', 119)
 name_op('STORE_ATTR_REF', 120, 0x7F)  # Index in name list
+def_op('COMPARE_OP_REF', 121,  0x7F)  # Comparison operator
+hascompare.append(121)
 
 jrel_op('SETUP_FINALLY', 122)   # Distance to target address
 

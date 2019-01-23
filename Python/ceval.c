@@ -2817,6 +2817,20 @@ main_loop:
             DISPATCH();
         }
 
+        case TARGET(COMPARE_OP_REF): {
+            PyObject *right = POP();
+            PyObject *left = TOP();
+            PyObject *res = cmp_outcome(oparg & 0x7F, left, right);
+            if(oparg & 0x80)
+                Py_DECREF(left);
+            SET_TOP(res);
+            if (res == NULL)
+                goto error;
+            PREDICT(POP_JUMP_IF_FALSE);
+            PREDICT(POP_JUMP_IF_TRUE);
+            FAST_DISPATCH();
+        }
+
         case TARGET(IMPORT_NAME): {
             PyObject *name = GETITEM(names, oparg);
             PyObject *fromlist = POP();
