@@ -22,6 +22,23 @@
 #define INTRINSIC_NEAREST_POWER_OF_TWO(x, m) (x < m ?                        \
             m : (((x & (x - 1)) == 0) ?                                      \
                  x : _INTRINSIC_NEAREST_POWER_OF_TWO(Py_ssize_t, x)))
+
+#define CACHE_LINE_SIZE 64
+
+#define PREFETCH_ARRAY_R(T, pointer, nentries)                               \
+    do {                                                                     \
+        void *ptr = (void*)pointer;                                          \
+        void *ptr_max = ptr + (sizeof(T) * nentries);                        \
+        do  {                                                                \
+                __builtin_prefetch(ptr, 0, 1);                               \
+                ptr += CACHE_LINE_SIZE;                                      \
+        } while (ptr < ptr_max);                                             \
+    } while (0)
+
+#else
+
+#define PREFETCH_ARRAY_R(T, pointer, nentries)
+
 #endif
 
 #endif /* !Py_INTERNAL_INTRPOW2_H */

@@ -1141,6 +1141,12 @@ dictresize(PyDictObject *mp, Py_ssize_t minsize)
     PyObject **oldvalues;
     PyDictKeyEntry *oldentries, *newentries;
 
+
+    numentries = mp->ma_used;
+    oldkeys = mp->ma_keys;
+    oldentries = DK_ENTRIES(oldkeys);
+    PREFETCH_ARRAY_R(PyDictKeyEntry, oldentries, numentries);
+
     /* Find the smallest table size > minused. */
 #ifdef INTRINSIC_NEAREST_POWER_OF_TWO
     newsize = INTRINSIC_NEAREST_POWER_OF_TWO(minsize, PyDict_MINSIZE);
@@ -1155,7 +1161,6 @@ dictresize(PyDictObject *mp, Py_ssize_t minsize)
         return -1;
     }
 
-    oldkeys = mp->ma_keys;
 
     /* NOTE: Current odict checks mp->ma_keys to detect resize happen.
      * So we can't reuse oldkeys even if oldkeys->dk_size == newsize.
@@ -1173,8 +1178,6 @@ dictresize(PyDictObject *mp, Py_ssize_t minsize)
     if (oldkeys->dk_lookup == lookdict)
         mp->ma_keys->dk_lookup = lookdict;
 
-    numentries = mp->ma_used;
-    oldentries = DK_ENTRIES(oldkeys);
     newentries = DK_ENTRIES(mp->ma_keys);
     oldvalues = mp->ma_values;
     if (oldvalues != NULL) {
