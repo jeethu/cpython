@@ -230,6 +230,10 @@ get_ref_op(unsigned char op) {
             return STORE_ATTR_REF;
         case STORE_SUBSCR:
             return STORE_SUBSCR_REF;
+        case LIST_APPEND:
+            return LIST_APPEND_REF;
+        case SET_ADD:
+            return SET_ADD_REF;
         default:
             return op;
     }
@@ -471,6 +475,8 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
             case STORE_SUBSCR:
             case LOAD_ATTR:
             case STORE_ATTR:
+            case LIST_APPEND:
+            case SET_ADD:
                 for (j = 1;
                      i >= j && _Py_OPCODE(codestr[i - j]) == EXTENDED_ARG;
                      j++);
@@ -487,14 +493,13 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                     if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
                         codestr[i - j] = PACKOPARG(get_ref_op(last_opcode),
                                                    get_arg(codestr, i - j));
-                        if (opcode == LOAD_ATTR)
-                            instr_oparg = get_arg(codestr, i);
-                        else if (opcode == COMPARE_OP || opcode == STORE_ATTR)
+                        if (opcode == LOAD_ATTR || opcode == LIST_APPEND || opcode == SET_ADD) {
+                            codestr[i] = PACKOPARG(get_ref_op(opcode), get_arg(codestr, i));
+                            break;
+                        }
+                        if (opcode == COMPARE_OP || opcode == STORE_ATTR)
                             instr_oparg = get_arg(codestr, i) | 0x80;
                         codestr[i] = PACKOPARG(get_ref_op(opcode), instr_oparg);
-
-                        if (opcode == LOAD_ATTR)
-                            break;
 
                         /* Try to optimize the LOAD_(FAST|CONST) 1 instruction behind */
                         for (j = 2;

@@ -105,6 +105,8 @@ extern "C" {
 #define STORE_FAST              125
 #define DELETE_FAST             126
 #define LOAD_FAST_REF           127
+#define LIST_APPEND_REF         128
+#define SET_ADD_REF             129
 #define RAISE_VARARGS           130
 #define CALL_FUNCTION           131
 #define MAKE_FUNCTION           132

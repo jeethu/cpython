@@ -175,12 +175,15 @@ jrel_op('SETUP_FINALLY', 122)   # Distance to target address
 
 def_op('LOAD_FAST', 124)        # Local variable number
 haslocal.append(124)
-def_op('LOAD_FAST_REF', 127)        # Local variable number
-haslocal.append(127)
 def_op('STORE_FAST', 125)       # Local variable number
 haslocal.append(125)
 def_op('DELETE_FAST', 126)      # Local variable number
 haslocal.append(126)
+def_op('LOAD_FAST_REF', 127)    # Local variable number
+haslocal.append(127)
+
+def_op('LIST_APPEND_REF', 128)
+def_op('SET_ADD_REF', 129)
 
 def_op('RAISE_VARARGS', 130)    # Number of raise arguments (1, 2, or 3)
 def_op('CALL_FUNCTION', 131)    # #args

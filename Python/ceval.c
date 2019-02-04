@@ -1492,6 +1492,17 @@ main_loop:
             DISPATCH();
         }
 
+        case TARGET(LIST_APPEND_REF): {
+            PyObject *v = POP();
+            PyObject *list = PEEK(oparg);
+            int err;
+            err = PyList_Append(list, v);
+            if (err != 0)
+                goto error;
+            PREDICT(JUMP_ABSOLUTE);
+            FAST_DISPATCH();
+        }
+
         case TARGET(SET_ADD): {
             PyObject *v = POP();
             PyObject *set = PEEK(oparg);
@@ -1502,6 +1513,17 @@ main_loop:
                 goto error;
             PREDICT(JUMP_ABSOLUTE);
             DISPATCH();
+        }
+
+        case TARGET(SET_ADD_REF): {
+            PyObject *v = POP();
+            PyObject *set = PEEK(oparg);
+            int err;
+            err = PySet_Add(set, v);
+            if (err != 0)
+                goto error;
+            PREDICT(JUMP_ABSOLUTE);
+            FAST_DISPATCH();
         }
 
         case TARGET(INPLACE_POWER): {

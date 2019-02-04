@@ -893,7 +893,9 @@ stack_effect(int opcode, int oparg, int jump)
             return 0;
 
         case SET_ADD:
+        case SET_ADD_REF:
         case LIST_APPEND:
+        case LIST_APPEND_REF:
             return -1;
         case MAP_ADD:
             return -2;
