@@ -234,6 +234,8 @@ get_ref_op(unsigned char op) {
             return LIST_APPEND_REF;
         case SET_ADD:
             return SET_ADD_REF;
+        case STORE_FAST_NOPOP:
+            return STORE_FAST_NOPOP_REF;
         default:
             return op;
     }
@@ -470,6 +472,32 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                 }
                 break;
 
+            case STORE_FAST:
+                if (nextop == LOAD_FAST) {
+                   if (get_arg(codestr, i) == get_arg(codestr, nexti) &&
+                       ISBASICBLOCK(blocks, i, nexti)) {
+                       for (j = 1;
+                            i >= j && _Py_OPCODE(codestr[i - j]) == EXTENDED_ARG;
+                            j++);
+                       if (i > j) {
+                           unsigned char lastop = _Py_OPCODE(i - j);
+                           if (lastop == BINARY_ADD || lastop == INPLACE_ADD)
+                               break;
+                       }
+                       codestr[i] = PACKOPARG(NOP, 0);
+                       codestr[nexti] = PACKOPARG(STORE_FAST_NOPOP, get_arg(codestr, nexti));
+                   }
+                }
+                break;
+
+            case STORE_FAST_NOPOP:
+                if ((nextop == LIST_APPEND || nextop == SET_ADD)
+                    && ISBASICBLOCK(blocks, i, nexti)) {
+                    codestr[i] = PACKOPARG(get_ref_op(opcode), get_arg(codestr, i));
+                    codestr[nexti] = PACKOPARG(get_ref_op(nextop), get_arg(codestr, nexti));
+                }
+                break;
+
             case BINARY_SUBSCR:
             case COMPARE_OP:
             case STORE_SUBSCR:
@@ -501,13 +529,15 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
                             instr_oparg = get_arg(codestr, i) | 0x80;
                         codestr[i] = PACKOPARG(get_ref_op(opcode), instr_oparg);
 
-                        /* Try to optimize the LOAD_(FAST|CONST) 1 instruction behind */
+                        /* Try to optimize the LOAD_(FAST|CONST) or STORE_FAST_NOPOP
+                         * 2 instructions behind */
                         for (j = 2;
                              i >= j && _Py_OPCODE(codestr[i - j]) == EXTENDED_ARG;
                              j++);
                         if (i >= j && ISBASICBLOCK(blocks, i - j, i)) {
                             last_opcode = _Py_OPCODE(codestr[i - j]);
-                            if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST) {
+                            if (last_opcode == LOAD_CONST || last_opcode == LOAD_FAST ||
+                                last_opcode == STORE_FAST_NOPOP) {
                                 codestr[i - j] = PACKOPARG(get_ref_op(last_opcode),
                                                            get_arg(codestr, i - j));
                                 if (opcode == COMPARE_OP || opcode == STORE_ATTR)

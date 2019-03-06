@@ -198,6 +198,11 @@ hasfree.append(137)
 def_op('DELETE_DEREF', 138)
 hasfree.append(138)
 
+def_op('STORE_FAST_NOPOP', 139)
+haslocal.append(139)
+def_op('STORE_FAST_NOPOP_REF', 140)
+haslocal.append(140)
+
 def_op('CALL_FUNCTION_KW', 141)  # #args + #kwargs
 def_op('CALL_FUNCTION_EX', 142)  # Flags
 

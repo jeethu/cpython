@@ -115,6 +115,8 @@ extern "C" {
 #define LOAD_DEREF              136
 #define STORE_DEREF             137
 #define DELETE_DEREF            138
+#define STORE_FAST_NOPOP        139
+#define STORE_FAST_NOPOP_REF    140
 #define CALL_FUNCTION_KW        141
 #define CALL_FUNCTION_EX        142
 #define SETUP_WITH              143

@@ -1105,6 +1105,10 @@ stack_effect(int opcode, int oparg, int jump)
         case DELETE_DEREF:
             return 0;
 
+        case STORE_FAST_NOPOP:
+        case STORE_FAST_NOPOP_REF:
+            return 0;
+
         /* Iterators and generators */
         case GET_AWAITABLE:
             return 0;

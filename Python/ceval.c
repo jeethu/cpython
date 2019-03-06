@@ -1170,8 +1170,22 @@ main_loop:
         }
 
         case TARGET(STORE_FAST): {
-            PREDICTED(STORE_FAST);
             PyObject *value = POP();
+            SETLOCAL(oparg, value);
+            FAST_DISPATCH();
+        }
+
+        case TARGET(STORE_FAST_NOPOP): {
+            PREDICTED(STORE_FAST_NOPOP);
+            PyObject *value = TOP();
+            SETLOCAL(oparg, value);
+            Py_INCREF(value);
+            FAST_DISPATCH();
+        }
+
+        case TARGET(STORE_FAST_NOPOP_REF): {
+            PREDICTED(STORE_FAST_NOPOP_REF);
+            PyObject *value = TOP();
             SETLOCAL(oparg, value);
             FAST_DISPATCH();
         }
@@ -3070,7 +3084,8 @@ main_loop:
             PyObject *next = (*iter->ob_type->tp_iternext)(iter);
             if (next != NULL) {
                 PUSH(next);
-                PREDICT(STORE_FAST);
+                PREDICT(STORE_FAST_NOPOP_REF);
+                PREDICT(STORE_FAST_NOPOP);
                 PREDICT(UNPACK_SEQUENCE);
                 DISPATCH();
             }
